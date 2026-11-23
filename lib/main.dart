@@ -326,10 +326,21 @@ class _NudgeHomeState extends State<NudgeHome> {
             if (picked != null) refresh(() => deadline = picked);
           }),
           const SizedBox(height: 12),
-          SizedBox(width: double.infinity, child: FilledButton(onPressed: () {
+          SizedBox(width: double.infinity, child: FilledButton(onPressed: () async {
             if (title.text.trim().isEmpty) return;
-            _addTask(Task(title: title.text.trim(), subject: subject.text.trim().isEmpty ? 'Personal' : subject.text.trim(), due: deadline));
-            Navigator.pop(sheetContext);
+            try {
+              await _addTask(Task(
+                title: title.text.trim(),
+                subject: subject.text.trim().isEmpty ? 'Personal' : subject.text.trim(),
+                due: deadline,
+              ));
+              if (sheetContext.mounted) Navigator.pop(sheetContext);
+            } catch (error) {
+              if (!sheetContext.mounted) return;
+              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                SnackBar(content: Text('Tugas gagal disimpan: $error')),
+              );
+            }
           }, style: FilledButton.styleFrom(backgroundColor: _orange, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 15)), child: const Text('Save task'))),
         ]),
       )),
