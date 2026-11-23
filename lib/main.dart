@@ -2,22 +2,34 @@ import 'package:flutter/material.dart';
 
 void main() => runApp(const NudgeApp());
 
-const bg = Color(0xFF17181B), panel = Color(0xFF242426), orange = Color(0xFFFF743A), muted = Color(0xFF96969B);
+const _bg = Color(0xFF171719);
+const _surface = Color(0xFF232325);
+const _surface2 = Color(0xFF2B2B2D);
+const _orange = Color(0xFFFF783F);
+const _muted = Color(0xFF96969B);
 
 class NudgeApp extends StatelessWidget {
   const NudgeApp({super.key});
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'Nudge', debugShowCheckedModeBanner: false,
-    theme: ThemeData(brightness: Brightness.dark, scaffoldBackgroundColor: bg, colorScheme: const ColorScheme.dark(primary: orange, surface: panel), useMaterial3: true),
+    title: 'Nudge',
+    debugShowCheckedModeBanner: false,
+    theme: ThemeData(
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: _bg,
+      colorScheme: const ColorScheme.dark(primary: _orange, surface: _surface),
+      useMaterial3: true,
+      fontFamily: 'Roboto',
+    ),
     home: const NudgeHome(),
   );
 }
 
 class Task {
-  Task(this.title, this.course, this.deadline, {this.done = false});
-  final String title, course;
-  final DateTime deadline;
+  Task({required this.title, required this.subject, required this.due, this.done = false});
+  final String title;
+  final String subject;
+  final DateTime due;
   bool done;
 }
 
@@ -28,119 +40,249 @@ class NudgeHome extends StatefulWidget {
 }
 
 class _NudgeHomeState extends State<NudgeHome> {
-  int page = 0;
-  final tasks = <Task>[
-    Task('Review operating systems notes', 'Sistem Operasi', DateTime.now().add(const Duration(hours: 3))),
-    Task('Finish database ERD', 'Basis Data', DateTime.now().add(const Duration(days: 1))),
-    Task('Read chapter 4 — algorithms', 'Algoritma', DateTime.now().add(const Duration(days: 3))),
+  int _tab = 0;
+  final List<Task> _tasks = [
+    Task(title: 'Review operating systems notes', subject: 'Sistem Operasi', due: DateTime.now().add(const Duration(hours: 4))),
+    Task(title: 'Finish database ERD', subject: 'Basis Data', due: DateTime.now().add(const Duration(days: 1))),
+    Task(title: 'Read chapter 4 — algorithms', subject: 'Algoritma', due: DateTime.now().add(const Duration(days: 3))),
   ];
-  int get done => tasks.where((t) => t.done).length;
-  int get pending => tasks.length - done;
+  int get _completed => _tasks.where((t) => t.done).length;
+  int get _pending => _tasks.length - _completed;
 
-  void add(Task task) => setState(() => tasks.insert(0, task));
+  void _addTask(Task task) => setState(() => _tasks.insert(0, task));
+  void _toggle(Task task) => setState(() => task.done = !task.done);
+  void _remove(Task task) => setState(() => _tasks.remove(task));
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(child: IndexedStack(index: page, children: [
-      dashboard(),
-      overview(),
-      projects(),
-      settings(),
-    ])),
-    floatingActionButton: page == 0 ? FloatingActionButton(backgroundColor: orange, foregroundColor: Colors.white, onPressed: () => addTask(context, add), child: const Icon(Icons.add, size: 30)) : null,
-    floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-    bottomNavigationBar: NavigationBar(
-      backgroundColor: const Color(0xFF101011), indicatorColor: orange.withValues(alpha: .16),
-      selectedIndex: page, onDestinationSelected: (i) => setState(() => page = i),
-      destinations: const [
-        NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-        NavigationDestination(icon: Icon(Icons.bar_chart_rounded), label: 'Overview'),
-        NavigationDestination(icon: Icon(Icons.folder_open_outlined), label: 'Projects'),
-        NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Settings'),
+  Widget build(BuildContext context) {
+    final screens = [_home(), _overview(), _projects(), _settings()];
+    return Scaffold(
+      body: SafeArea(child: IndexedStack(index: _tab, children: screens)),
+      floatingActionButton: _tab == 0
+          ? FloatingActionButton(
+              onPressed: () => _showAddTask(),
+              backgroundColor: _orange,
+              foregroundColor: Colors.white,
+              elevation: 1,
+              child: const Icon(Icons.add_rounded, size: 30),
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: NavigationBar(
+        backgroundColor: const Color(0xFF111112),
+        indicatorColor: _orange.withValues(alpha: .13),
+        selectedIndex: _tab,
+        onDestinationSelected: (i) => setState(() => _tab = i),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.analytics_outlined), label: 'Overview'),
+          NavigationDestination(icon: Icon(Icons.folder_open_outlined), label: 'Projects'),
+          NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Settings'),
+        ],
+      ),
+    );
+  }
+
+  Widget _home() {
+    final now = DateTime.now();
+    final today = _tasks.where((t) => !t.done && _sameDay(t.due, now)).toList();
+    final next = _tasks.where((t) => !t.done).toList()..sort((a, b) => a.due.compareTo(b.due);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(22, 18, 22, 104),
+      children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          const Icon(Icons.grid_view_rounded, color: Colors.white70),
+          const CircleAvatar(radius: 20, backgroundColor: Color(0xFF3D2D25), child: Icon(Icons.person_outline, color: _orange, size: 20)),
+        ]),
+        const SizedBox(height: 28),
+        const Text('Hello, Idan', style: TextStyle(fontSize: 29, fontWeight: FontWeight.w300, letterSpacing: -.4)),
+        const SizedBox(height: 6),
+        Text('$_pending tasks waiting for you', style: const TextStyle(color: _muted, fontSize: 14)),
+        const SizedBox(height: 22),
+        _nextCard(next.isEmpty ? null : next.first, today),
+        const SizedBox(height: 26),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          const Text('Your progress', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+          Text('$_completed / ${_tasks.length}', style: const TextStyle(color: _muted)),
+        ]),
+        const SizedBox(height: 12),
+        ClipRRect(borderRadius: BorderRadius.circular(10), child: LinearProgressIndicator(value: _tasks.isEmpty ? 0 : _completed / _tasks.length, minHeight: 7, backgroundColor: _surface2, color: _orange)),
+        const SizedBox(height: 16),
+        Row(children: [
+          Expanded(child: _statCard('$_completed', 'Completed', Icons.check_circle_outline)),
+          const SizedBox(width: 12),
+          Expanded(child: _statCard('$_pending', 'Remaining', Icons.timelapse_rounded)),
+        ]),
+        const SizedBox(height: 27),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          const Text('Tasks', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+          TextButton(onPressed: () => setState(() => _tab = 1), child: const Text('View overview', style: TextStyle(color: _orange))),
+        ]),
+        if (_tasks.isEmpty) _emptyTasks(),
+        ..._tasks.take(6).map(_taskTile),
       ],
+    );
+  }
+
+  Widget _nextCard(Task? task, List<Task> today) => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(23),
+      gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF40271D), Color(0xFF252323)]),
+    ),
+    child: Row(children: [
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('UP NEXT', style: TextStyle(color: _muted, fontSize: 11, letterSpacing: 1.5)),
+        const SizedBox(height: 9),
+        Text(task?.title ?? 'All caught up', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
+        const SizedBox(height: 6),
+        Text(task != null ? '${task.subject} · ${_dateLabel(task.due)}' : 'Take a breather. You earned it.', style: const TextStyle(color: _muted, fontSize: 12)),
+      ])),
+      const Icon(Icons.arrow_forward_rounded, color: _orange),
+    ]),
+  );
+
+  Widget _statCard(String value, String label, IconData icon) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 17, horizontal: 15),
+    decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(18)),
+    child: Row(children: [
+      Icon(icon, color: _orange, size: 21), const SizedBox(width: 12),
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w400)),
+        Text(label, style: const TextStyle(color: _muted, fontSize: 12)),
+      ]),
+    ]),
+  );
+
+  Widget _taskTile(Task task) => Dismissible(
+    key: ObjectKey(task),
+    direction: DismissDirection.endToStart,
+    background: Container(margin: const EdgeInsets.only(bottom: 10), alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: .7), borderRadius: BorderRadius.circular(17)), child: const Icon(Icons.delete_outline)),
+    onDismissed: (_) => _remove(task),
+    child: Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(17)),
+      child: Row(children: [
+        InkWell(onTap: () => _toggle(task), borderRadius: BorderRadius.circular(20), child: Icon(task.done ? Icons.check_circle_rounded : Icons.circle_outlined, color: task.done ? _orange : _muted, size: 23)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(task.title, style: TextStyle(fontSize: 14, decoration: task.done ? TextDecoration.lineThrough : null, color: task.done ? _muted : Colors.white)),
+          const SizedBox(height: 5),
+          Text('${task.subject} · ${_dateLabel(task.due)}', style: const TextStyle(color: _muted, fontSize: 11)),
+        ])),
+        const Icon(Icons.more_horiz, color: _muted, size: 19),
+      ]),
     ),
   );
 
-  Widget dashboard() {
-    final today = DateTime.now();
-    final todayTasks = tasks.where((t) => !t.done && t.deadline.year == today.year && t.deadline.month == today.month && t.deadline.day == today.day).toList();
-    final next = tasks.where((t) => !t.done).firstOrNull;
-    return ListView(padding: const EdgeInsets.fromLTRB(22, 18, 22, 100), children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: const [Icon(Icons.grid_view_rounded, color: Colors.white70), CircleAvatar(backgroundColor: Color(0xFF3C302B), child: Icon(Icons.person_outline, color: orange))]),
-      const SizedBox(height: 28),
-      const Text('Hello, Idan', style: TextStyle(fontSize: 29, fontWeight: FontWeight.w300)),
-      const SizedBox(height: 6),
-      Text(pending.toString() + ' tasks are pending', style: const TextStyle(color: muted, fontSize: 14)),
-      const SizedBox(height: 22),
-      Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF38241B), Color(0xFF1E1E1F)])), child: Row(children: [
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('UP NEXT', style: TextStyle(color: muted, fontSize: 11, letterSpacing: 1.4)),
-          const SizedBox(height: 9),
-          Text(next?.title ?? 'You’re all caught up', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 6),
-          Text(todayTasks.isNotEmpty ? 'Due today · ' + todayTasks.first.course : 'Keep your momentum going', style: const TextStyle(color: muted, fontSize: 12)),
-        ])),
-        const Icon(Icons.arrow_forward_rounded, color: orange),
-      ])),
-      const SizedBox(height: 26),
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Your progress', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)), Text(done.toString() + '/' + tasks.length.toString(), style: const TextStyle(color: muted))]),
+  Widget _overview() {
+    final ratio = _tasks.isEmpty ? 0.0 : _completed / _tasks.length;
+    final overdue = _tasks.where((t) => !t.done && t.due.isBefore(DateTime.now())).length;
+    return ListView(padding: const EdgeInsets.fromLTRB(22, 24, 22, 30), children: [
+      const Text('Overview', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300)),
+      const SizedBox(height: 7),
+      const Text('A clear picture of your workload.', style: TextStyle(color: _muted)),
+      const SizedBox(height: 24),
+      _statCard('$_completed', 'Completed tasks', Icons.task_alt_outlined),
       const SizedBox(height: 12),
-      ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: tasks.isEmpty ? 0 : done / tasks.length, minHeight: 7, backgroundColor: panel, color: orange)),
-      const SizedBox(height: 18),
-      Row(children: [Expanded(child: stat(done.toString(), 'Done', Icons.check_circle_outline)), const SizedBox(width: 12), Expanded(child: stat(pending.toString(), 'To do', Icons.pending_outlined))]),
-      const SizedBox(height: 26),
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Task list', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)), TextButton(onPressed: () {}, child: const Text('See all', style: TextStyle(color: orange))]),
-      if (tasks.isEmpty) const Padding(padding: EdgeInsets.only(top: 20), child: Text('No tasks yet. Tap + to add one.', style: TextStyle(color: muted))),
-      ...tasks.take(6).map((t) => taskTile(t)),
+      _statCard('$_pending', 'Still pending', Icons.hourglass_empty_rounded),
+      const SizedBox(height: 12),
+      _statCard('$overdue', 'Overdue', Icons.warning_amber_rounded),
+      const SizedBox(height: 25),
+      const Text('Overall progress', style: TextStyle(fontSize: 17)),
+      const SizedBox(height: 12),
+      ClipRRect(borderRadius: BorderRadius.circular(10), child: LinearProgressIndicator(value: ratio, minHeight: 8, backgroundColor: _surface2, color: _orange)),
+      const SizedBox(height: 8),
+      Text('${(ratio * 100).round()}% complete', style: const TextStyle(color: _muted)),
+      const SizedBox(height: 28),
+      const Text('Coming up', style: TextStyle(fontSize: 17)),
+      const SizedBox(height: 12),
+      ...(_tasks.where((t) => !t.done).toList()..sort((a, b) => a.due.compareTo(b.due)).take(4).map(_taskTile),
     ]);
   }
 
-  Widget stat(String value, String label, IconData icon) => Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(18)), child: Row(children: [Icon(icon, color: orange, size: 21), const SizedBox(width: 12), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(value, style: const TextStyle(fontSize: 24)), Text(label, style: const TextStyle(color: muted, fontSize: 12))])]));
-
-  Widget taskTile(Task task) => Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13), decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(17)), child: Row(children: [
-    InkWell(onTap: () => setState(() => task.done = !task.done), child: Icon(task.done ? Icons.check_circle : Icons.circle_outlined, color: task.done ? orange : muted, size: 22)),
-    const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(task.title, style: TextStyle(fontSize: 14, decoration: task.done ? TextDecoration.lineThrough : null, color: task.done ? muted : Colors.white)),
-      const SizedBox(height: 4), Text(task.course + ' · ' + task.deadline.day.toString() + '/' + task.deadline.month.toString(), style: const TextStyle(color: muted, fontSize: 11)),
+  Widget _projects() => ListView(padding: const EdgeInsets.all(22), children: [
+    const SizedBox(height: 8),
+    const Text('Projects', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300)),
+    const SizedBox(height: 7),
+    const Text('Make big assignments feel manageable.', style: TextStyle(color: _muted)),
+    const SizedBox(height: 23),
+    Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(22)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(width: 42, height: 42, decoration: BoxDecoration(color: _orange.withValues(alpha: .13), borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.layers_outlined, color: _orange)),
+      const SizedBox(height: 16),
+      const Text('UAS Project Planner', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+      const SizedBox(height: 7),
+      const Text('Break a final project into milestones, small tasks, and realistic due dates. Project planning will be the next feature we build.', style: TextStyle(color: _muted, height: 1.5)),
+      const SizedBox(height: 18),
+      OutlinedButton.icon(onPressed: () => _showAddTask(), icon: const Icon(Icons.add), label: const Text('Add a project task'), style: OutlinedButton.styleFrom(foregroundColor: _orange)),
     ])),
+    const SizedBox(height: 20),
+    const Text('Tasks assigned to projects will be grouped here in a later update.', style: TextStyle(color: _muted, height: 1.5)),
+  ]);
+
+  Widget _settings() => ListView(padding: const EdgeInsets.fromLTRB(22, 24, 22, 30), children: [
+    const Text('Settings', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300)),
+    const SizedBox(height: 7),
+    const Text('Keep Nudge simple and personal.', style: TextStyle(color: _muted)),
+    const SizedBox(height: 20),
+    _settingTile(Icons.notifications_none_rounded, 'Reminders', 'Scheduled local reminders will be added next'),
+    _settingTile(Icons.dark_mode_outlined, 'Appearance', 'Dark mode · warm orange accents'),
+    _settingTile(Icons.backup_outlined, 'Data backup', 'Local backup option planned'),
+    _settingTile(Icons.info_outline_rounded, 'About Nudge', 'Personal academic task tracker'),
+  ]);
+
+  Widget _settingTile(IconData icon, String title, String subtitle) => Container(
+    margin: const EdgeInsets.only(bottom: 9),
+    decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(16)),
+    child: ListTile(leading: Icon(icon, color: _orange), title: Text(title), subtitle: Text(subtitle, style: const TextStyle(color: _muted, fontSize: 12))),
+  );
+
+  Widget _emptyTasks() => Padding(padding: const EdgeInsets.symmetric(vertical: 25), child: Column(children: const [
+    Icon(Icons.task_alt_outlined, size: 36, color: _muted), SizedBox(height: 10),
+    Text('No tasks yet', style: TextStyle(color: _muted)), SizedBox(height: 4),
+    Text('Tap + to add your first task.', style: TextStyle(color: _muted, fontSize: 12)),
   ]));
 
-  Widget overview() => Padding(padding: const EdgeInsets.all(22), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    const SizedBox(height: 20), const Text('Overview', style: TextStyle(fontSize: 27, fontWeight: FontWeight.w300)), const SizedBox(height: 8), const Text('A quick look at your workload.', style: TextStyle(color: muted)), const SizedBox(height: 24),
-    stat(done.toString(), 'Completed tasks', Icons.task_alt), const SizedBox(height: 12), stat(pending.toString(), 'Still pending', Icons.hourglass_empty), const SizedBox(height: 24),
-    const Text('Completion'), const SizedBox(height: 12), LinearProgressIndicator(value: tasks.isEmpty ? 0 : done / tasks.length, color: orange, backgroundColor: panel, minHeight: 7),
-    const SizedBox(height: 8), Text(tasks.isEmpty ? 'No tasks yet' : (done / tasks.length * 100).round().toString() + '% completed', style: const TextStyle(color: muted)),
-  ]));
-
-  Widget projects() => Padding(padding: const EdgeInsets.all(22), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    const SizedBox(height: 20), const Text('Projects', style: TextStyle(fontSize: 27, fontWeight: FontWeight.w300)), const SizedBox(height: 8), const Text('Break bigger assignments into milestones.', style: TextStyle(color: muted)), const SizedBox(height: 24),
-    Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(22)), child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.construction_outlined, color: orange, size: 28), SizedBox(height: 14), Text('Project workspace is next', style: TextStyle(fontSize: 17)), SizedBox(height: 6), Text('UAS projects will be split into steps, milestones, and deadlines to make the workload easier to manage.', style: TextStyle(color: muted, height: 1.5))]))]));
-
-  Widget settings() => const Padding(padding: EdgeInsets.all(22), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    SizedBox(height: 20), Text('Settings', style: TextStyle(fontSize: 27, fontWeight: FontWeight.w300)), SizedBox(height: 8), Text('Personalize how Nudge works.', style: TextStyle(color: muted)),
-    SizedBox(height: 20), ListTile(leading: Icon(Icons.notifications_outlined, color: orange), title: Text('Reminders'), subtitle: Text('Local notifications — planned next')),
-    ListTile(leading: Icon(Icons.palette_outlined, color: orange), title: Text('Appearance'), subtitle: Text('Dark theme')),
-    ListTile(leading: Icon(Icons.backup_outlined, color: orange), title: Text('Backup'), subtitle: Text('Local backup — planned')),
-  ]));
+  Future<void> _showAddTask() async {
+    final title = TextEditingController();
+    final subject = TextEditingController();
+    DateTime deadline = DateTime.now().add(const Duration(days: 1));
+    await showModalBottomSheet<void>(
+      context: context, isScrollControlled: true, backgroundColor: _surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetContext) => StatefulBuilder(builder: (sheetContext, refresh) => Padding(
+        padding: EdgeInsets.fromLTRB(22, 24, 22, MediaQuery.of(sheetContext).viewInsets.bottom + 24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Add a task', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 16),
+          TextField(controller: title, autofocus: true, decoration: const InputDecoration(labelText: 'Task name', hintText: 'e.g. Finish UAS report')),
+          const SizedBox(height: 10),
+          TextField(controller: subject, decoration: const InputDecoration(labelText: 'Course / subject', hintText: 'e.g. Sistem Operasi')),
+          const SizedBox(height: 12),
+          ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.calendar_today_outlined, color: _orange), title: const Text('Deadline'), subtitle: Text(_dateLabel(deadline)), trailing: const Icon(Icons.chevron_right, color: _muted), onTap: () async {
+            final picked = await showDatePicker(context: sheetContext, initialDate: deadline, firstDate: DateTime.now(), lastDate: DateTime(2035), builder: (ctx, child) => Theme(data: Theme.of(ctx).copyWith(colorScheme: const ColorScheme.dark(primary: _orange, surface: _surface)), child: child!));
+            if (picked != null) refresh(() => deadline = picked);
+          }),
+          const SizedBox(height: 12),
+          SizedBox(width: double.infinity, child: FilledButton(onPressed: () {
+            if (title.text.trim().isEmpty) return;
+            _addTask(Task(title: title.text.trim(), subject: subject.text.trim().isEmpty ? 'Personal' : subject.text.trim(), due: deadline));
+            Navigator.pop(sheetContext);
+          }, style: FilledButton.styleFrom(backgroundColor: _orange, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 15)), child: const Text('Save task'))),
+        ]),
+      )),
+    );
+    title.dispose();
+    subject.dispose();
+  }
 }
 
-Future<void> addTask(BuildContext context, void Function(Task) onSave) async {
-  final title = TextEditingController(), course = TextEditingController();
-  DateTime date = DateTime.now().add(const Duration(days: 1));
-  await showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: panel, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))), builder: (ctx) => StatefulBuilder(builder: (ctx, refresh) => Padding(
-    padding: EdgeInsets.fromLTRB(22, 24, 22, MediaQuery.of(ctx).viewInsets.bottom + 24),
-    child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Add a task', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w500)), const SizedBox(height: 16),
-      TextField(controller: title, autofocus: true, decoration: const InputDecoration(labelText: 'Task name', hintText: 'e.g. Finish UAS report')),
-      const SizedBox(height: 10), TextField(controller: course, decoration: const InputDecoration(labelText: 'Course / subject')),
-      const SizedBox(height: 10), ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.calendar_today_outlined, color: orange), title: const Text('Deadline'), subtitle: Text(date.day.toString() + '/' + date.month.toString() + '/' + date.year.toString()), trailing: const Icon(Icons.chevron_right), onTap: () async {
-        final picked = await showDatePicker(context: ctx, initialDate: date, firstDate: DateTime.now(), lastDate: DateTime(2035));
-        if (picked != null) refresh(() => date = picked);
-      }),
-      const SizedBox(height: 10), SizedBox(width: double.infinity, child: FilledButton(style: FilledButton.styleFrom(backgroundColor: orange, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 15)), onPressed: () {
-        if (title.text.trim().isEmpty) return;
-        onSave(Task(title.text.trim(), course.text.trim().isEmpty ? 'Personal' : course.text.trim(), date)); Navigator.pop(ctx);
-      }, child: const Text('Save task'))),
-    ]),
-  )));
+bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+String _dateLabel(DateTime date) {
+  final now = DateTime.now();
+  if (_sameDay(date, now)) return 'Today';
+  if (_sameDay(date, now.add(const Duration(days: 1)))) return 'Tomorrow';
+  return '${date.day} ${_monthName(date.month)}';
 }
+String _monthName(int m) => const ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1];
