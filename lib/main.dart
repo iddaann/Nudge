@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'data/nudge_database.dart';
 
 void main() => runApp(const NudgeApp());
 
@@ -26,7 +27,8 @@ class NudgeApp extends StatelessWidget {
 }
 
 class Task {
-  Task({required this.title, required this.subject, required this.due, this.done = false});
+  Task({this.id, required this.title, required this.subject, required this.due, this.done = false});
+  final int? id;
   final String title;
   final String subject;
   final DateTime due;
@@ -41,23 +43,81 @@ class NudgeHome extends StatefulWidget {
 
 class _NudgeHomeState extends State<NudgeHome> {
   int _tab = 0;
-  final List<Task> _tasks = [
-    Task(title: 'Review operating systems notes', subject: 'Sistem Operasi', due: DateTime.now().add(const Duration(hours: 4))),
-    Task(title: 'Finish database ERD', subject: 'Basis Data', due: DateTime.now().add(const Duration(days: 1))),
-    Task(title: 'Read chapter 4 — algorithms', subject: 'Algoritma', due: DateTime.now().add(const Duration(days: 3))),
-  ];
+  final List<Task> _tasks = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTasks();
+  }
+
+  Future<void> _loadTasks() async {
+    try {
+      final rows = await NudgeDatabase.instance.getTasks();
+      final loaded = rows.map((row) => Task(
+        id: row['id'] as int,
+        title: row['title'] as String,
+        subject: row['subject'] as String,
+        due: DateTime.parse(row['due_at'] as String),
+        done: (row['is_done'] as int) == 1,
+      )).toList();
+      if (!mounted) return;
+      setState(() {
+        _tasks
+          ..clear()
+          ..addAll(loaded);
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat tugas: $error')),
+      );
+    }
+  }
   int get _completed => _tasks.where((t) => t.done).length;
   int get _pending => _tasks.length - _completed;
 
-  void _addTask(Task task) => setState(() => _tasks.insert(0, task));
-  void _toggle(Task task) => setState(() => task.done = !task.done);
-  void _remove(Task task) => setState(() => _tasks.remove(task));
+  Future<void> _addTask(Task task) async {
+    final id = await NudgeDatabase.instance.insertTask(
+      title: task.title,
+      subject: task.subject,
+      due: task.due,
+    );
+    if (!mounted) return;
+    setState(() => _tasks.insert(0, Task(
+      id: id,
+      title: task.title,
+      subject: task.subject,
+      due: task.due,
+    )));
+  }
+
+  Future<void> _toggle(Task task) async {
+    if (task.id == null) return;
+    final nextDone = !task.done;
+    await NudgeDatabase.instance.updateTaskDone(task.id!, nextDone);
+    if (!mounted) return;
+    setState(() => task.done = nextDone);
+  }
+
+  Future<void> _remove(Task task) async {
+    if (task.id != null) {
+      await NudgeDatabase.instance.deleteTask(task.id!);
+    }
+    if (!mounted) return;
+    setState(() => _tasks.remove(task));
+  }
 
   @override
   Widget build(BuildContext context) {
     final screens = [_home(), _overview(), _projects(), _settings()];
     return Scaffold(
-      body: SafeArea(child: IndexedStack(index: _tab, children: screens)),
+      body: SafeArea(child: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: _orange))
+          : IndexedStack(index: _tab, children: screens)),
       floatingActionButton: _tab == 0
           ? FloatingActionButton(
               onPressed: () => _showAddTask(),
