@@ -178,7 +178,7 @@ class _NudgeHomeState extends State<NudgeHome> {
 
   Widget _overview() {
     final ratio = _tasks.isEmpty ? 0.0 : _completed / _tasks.length;
-    final upcoming = _tasks.where((t) => !t.done).toList()..sort((a, b) => a.due.compareTo(b.due);
+    final upcoming = _tasks.where((t) => !t.done).toList()..sort((a, b) => a.due.compareTo(b.due));
     final overdue = _tasks.where((t) => !t.done && t.due.isBefore(DateTime.now())).length;
     return ListView(padding: const EdgeInsets.fromLTRB(22, 24, 22, 30), children: [
       const Text('Overview', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300)),
