@@ -4,9 +4,14 @@ import 'package:sqflite/sqflite.dart';
 import 'sqlite_platform.dart' as sqlitePlatform;
 
 class NudgeDatabase {
-  NudgeDatabase._();
+  NudgeDatabase._({this._databasePathOverride});
+
+  /// Creates an isolated database instance for tests.
+  NudgeDatabase.forTesting({required String databasePath})
+      : this._(databasePathOverride: databasePath);
 
   static final NudgeDatabase instance = NudgeDatabase._();
+  final String? _databasePathOverride;
   Future<Database>? _databaseFuture;
 
   Future<Database> get database {
@@ -25,8 +30,8 @@ class NudgeDatabase {
 
   Future<Database> _openDatabase() async {
     await sqlitePlatform.initializeSqlitePlatform();
-    final directory = await sqlitePlatform.getDatabaseDirectoryPath();
-    final dbPath = p.join(directory, 'nudge.db');
+    final dbPath = _databasePathOverride ??
+        p.join(await sqlitePlatform.getDatabaseDirectoryPath(), 'nudge.db');
 
     return sqlitePlatform.getDatabaseFactory().openDatabase(
       dbPath,
@@ -51,6 +56,14 @@ class NudgeDatabase {
         },
       ),
     );
+  }
+
+  /// Closes this instance and clears its cached opening future.
+  Future<void> close() async {
+    final current = _databaseFuture;
+    if (current == null) return;
+    _databaseFuture = null;
+    await current.then((db) => db.close());
   }
 
   Future<List<Map<String, Object?>>> getTasks() async {
