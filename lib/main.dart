@@ -302,7 +302,18 @@ class _NudgeHomeState extends State<NudgeHome> {
           const SizedBox(height: 5),
           Text('${task.subject} · ${_dateLabel(task.due)}', style: const TextStyle(color: _muted, fontSize: 11)),
         ])),
-        const Icon(Icons.more_horiz, color: _muted, size: 19),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_horiz, color: _muted, size: 19),
+          color: _surface2,
+          onSelected: (choice) {
+            if (choice == 'edit') _showAddTask(task: task);
+            if (choice == 'delete') _remove(task);
+          },
+          itemBuilder: (_) => const [
+            PopupMenuItem(value: 'edit', child: Text('Edit task')),
+            PopupMenuItem(value: 'delete', child: Text('Delete task')),
+          ],
+        ),
       ]),
     ),
   );
@@ -376,35 +387,50 @@ class _NudgeHomeState extends State<NudgeHome> {
     Text('Tap + to add your first task.', style: TextStyle(color: _muted, fontSize: 12)),
   ]));
 
-  Future<void> _showAddTask() async {
-    final title = TextEditingController();
-    final subject = TextEditingController();
-    DateTime deadline = DateTime.now().add(const Duration(days: 1));
+  Future<void> _showAddTask({Task? task}) async {
+    final title = TextEditingController(text: task?.title ?? '');
+    final subject = TextEditingController(text: task?.subject ?? '');
+    DateTime deadline = task?.due ?? DateTime.now().add(const Duration(days: 1));
     await showModalBottomSheet<void>(
       context: context, isScrollControlled: true, backgroundColor: _surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (sheetContext) => StatefulBuilder(builder: (sheetContext, refresh) => Padding(
         padding: EdgeInsets.fromLTRB(22, 24, 22, MediaQuery.of(sheetContext).viewInsets.bottom + 24),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Add a task', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w500)),
+          Text(task == null ? 'Add a task' : 'Edit task', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w500)),
           const SizedBox(height: 16),
           TextField(controller: title, autofocus: true, decoration: const InputDecoration(labelText: 'Task name', hintText: 'e.g. Finish UAS report')),
           const SizedBox(height: 10),
           TextField(controller: subject, decoration: const InputDecoration(labelText: 'Course / subject', hintText: 'e.g. Sistem Operasi')),
           const SizedBox(height: 12),
           ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.calendar_today_outlined, color: _orange), title: const Text('Deadline'), subtitle: Text(_dateLabel(deadline)), trailing: const Icon(Icons.chevron_right, color: _muted), onTap: () async {
-            final picked = await showDatePicker(context: sheetContext, initialDate: deadline, firstDate: DateTime.now(), lastDate: DateTime(2035), builder: (ctx, child) => Theme(data: Theme.of(ctx).copyWith(colorScheme: const ColorScheme.dark(primary: _orange, surface: _surface)), child: child!));
+            final picked = await showDatePicker(context: sheetContext, initialDate: deadline, firstDate: DateTime(2000), lastDate: DateTime(2035), builder: (ctx, child) => Theme(data: Theme.of(ctx).copyWith(colorScheme: const ColorScheme.dark(primary: _orange, surface: _surface)), child: child!));
             if (picked != null) refresh(() => deadline = picked);
           }),
           const SizedBox(height: 12),
           SizedBox(width: double.infinity, child: FilledButton(onPressed: () async {
             if (title.text.trim().isEmpty) return;
             try {
-              await _addTask(Task(
-                title: title.text.trim(),
-                subject: subject.text.trim().isEmpty ? 'Personal' : subject.text.trim(),
-                due: deadline,
-              ));
+              final newTitle = title.text.trim();
+              final newSubject = subject.text.trim().isEmpty ? 'Personal' : subject.text.trim();
+              if (task == null) {
+                await _addTask(Task(title: newTitle, subject: newSubject, due: deadline));
+              } else {
+                final id = task.id;
+                if (id == null) throw StateError('Task has no database ID.');
+                final changed = await NudgeDatabase.instance.updateTask(
+                  id: id, title: newTitle, subject: newSubject, due: deadline,
+                );
+                if (changed == 0) throw StateError('Task no longer exists.');
+                if (mounted) {
+                  setState(() {
+                    final index = _tasks.indexOf(task);
+                    if (index >= 0) {
+                      _tasks[index] = Task(id: id, title: newTitle, subject: newSubject, due: deadline, done: task.done);
+                    }
+                  });
+                }
+              }
               if (sheetContext.mounted) Navigator.pop(sheetContext);
             } catch (error) {
               if (!sheetContext.mounted) return;
@@ -412,7 +438,7 @@ class _NudgeHomeState extends State<NudgeHome> {
                 SnackBar(content: Text('Tugas gagal disimpan: $error')),
               );
             }
-          }, style: FilledButton.styleFrom(backgroundColor: _orange, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 15)), child: const Text('Save task'))),
+          }, style: FilledButton.styleFrom(backgroundColor: _orange, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 15)), child: Text(task == null ? 'Save task' : 'Save changes'))),
         ]),
       )),
     );
