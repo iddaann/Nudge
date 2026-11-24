@@ -45,6 +45,8 @@ class _NudgeHomeState extends State<NudgeHome> {
   int _tab = 0;
   final List<Task> _tasks = [];
   bool _isLoading = true;
+  String? _loadError;
+  final Set<int> _updatingTaskIds = {};
 
   @override
   void initState() {
@@ -68,15 +70,58 @@ class _NudgeHomeState extends State<NudgeHome> {
           ..clear()
           ..addAll(loaded);
         _isLoading = false;
+        _loadError = null;
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memuat tugas: $error')),
-      );
+      setState(() {
+        _isLoading = false;
+        _loadError = error.toString();
+      });
     }
   }
+
+  Future<void> _retryLoadTasks() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    await _loadTasks();
+  }
+
+  Widget _databaseErrorView() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.storage_outlined, color: _orange, size: 40),
+          const SizedBox(height: 14),
+          const Text(
+            'Could not open local database',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _loadError ?? 'Unknown database error',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: _muted, fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: _retryLoadTasks,
+            style: FilledButton.styleFrom(
+              backgroundColor: _orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    ),
+  );
+
   int get _completed => _tasks.where((t) => t.done).length;
   int get _pending => _tasks.length - _completed;
 
@@ -96,19 +141,43 @@ class _NudgeHomeState extends State<NudgeHome> {
   }
 
   Future<void> _toggle(Task task) async {
-    if (task.id == null) return;
-    final nextDone = !task.done;
-    await NudgeDatabase.instance.updateTaskDone(task.id!, nextDone);
-    if (!mounted) return;
+    final id = task.id;
+    if (id == null || _updatingTaskIds.contains(id)) return;
+    final previous = task.done;
+    final nextDone = !previous;
+    _updatingTaskIds.add(id);
     setState(() => task.done = nextDone);
+    try {
+      final changed = await NudgeDatabase.instance.updateTaskDone(id, nextDone);
+      if (changed == 0) throw StateError('Task $id no longer exists in SQLite.');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => task.done = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Status gagal disimpan: $error')),
+      );
+    } finally {
+      _updatingTaskIds.remove(id);
+    }
   }
 
   Future<void> _remove(Task task) async {
-    if (task.id != null) {
-      await NudgeDatabase.instance.deleteTask(task.id!);
+    final index = _tasks.indexOf(task);
+    if (index < 0) return;
+    // Dismissible needs the widget removed synchronously after the swipe.
+    setState(() => _tasks.removeAt(index));
+    try {
+      if (task.id != null) {
+        await NudgeDatabase.instance.deleteTask(task.id!);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      final restoreAt = index > _tasks.length ? _tasks.length : index;
+      setState(() => _tasks.insert(restoreAt, task));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Tugas gagal dihapus dari database: $error')),
+      );
     }
-    if (!mounted) return;
-    setState(() => _tasks.remove(task));
   }
 
   @override
@@ -117,10 +186,12 @@ class _NudgeHomeState extends State<NudgeHome> {
     return Scaffold(
       body: SafeArea(child: _isLoading
           ? const Center(child: CircularProgressIndicator(color: _orange))
-          : IndexedStack(index: _tab, children: screens)),
+          : _loadError != null
+              ? _databaseErrorView()
+              : IndexedStack(index: _tab, children: screens)),
       floatingActionButton: _tab == 0
           ? FloatingActionButton(
-              onPressed: () => _showAddTask(),
+              onPressed: (_isLoading || _loadError != null) ? null : () => _showAddTask(),
               backgroundColor: _orange,
               foregroundColor: Colors.white,
               elevation: 1,
@@ -218,7 +289,7 @@ class _NudgeHomeState extends State<NudgeHome> {
     key: ObjectKey(task),
     direction: DismissDirection.endToStart,
     background: Container(margin: const EdgeInsets.only(bottom: 10), alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: .7), borderRadius: BorderRadius.circular(17)), child: const Icon(Icons.delete_outline)),
-    onDismissed: (_) => _remove(task),
+    onDismissed: (_) { _remove(task); },
     child: Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
