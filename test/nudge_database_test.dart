@@ -96,7 +96,7 @@ void main() {
 
   test('rejects an invalid backup without deleting current data', () async {
     await database.insertTask(title: 'Keep me', subject: 'Test', due: DateTime(2026, 12, 20));
-    expect(() => database.importData({'format': 'wrong'}), throwsFormatException);
+    await expectLater(database.importData({'format': 'wrong'}), throwsFormatException);
     expect((await database.getTasks()).single['title'], 'Keep me');
   });
   test('keeps task data after closing and reopening database', () async {
