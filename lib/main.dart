@@ -526,10 +526,33 @@ class _NudgeHomeState extends State<NudgeHome> {
     const SizedBox(height: 20),
     _settingTile(Icons.notifications_none_rounded, 'Reminders', 'Scheduled local reminders will be added next'),
     _settingTile(Icons.dark_mode_outlined, 'Appearance', 'Dark mode · warm orange accents'),
-    _settingTile(Icons.backup_outlined, 'Data backup', 'Local backup option planned'),
+    ListTile(leading: const Icon(Icons.backup_outlined, color: _orange), title: const Text('Export backup'), subtitle: const Text('Copy JSON backup to clipboard', style: TextStyle(color: _muted, fontSize: 12)), onTap: _exportBackup),
+    ListTile(leading: const Icon(Icons.restore_outlined, color: _orange), title: const Text('Import backup'), subtitle: const Text('Restore from JSON backup', style: TextStyle(color: _muted, fontSize: 12)), onTap: _importBackup),
     _settingTile(Icons.info_outline_rounded, 'About Nudge', 'Personal academic task tracker'),
   ]);
 
+  Future<void> _exportBackup() async {
+    final data = await NudgeDatabase.instance.exportData();
+    final json = const JsonEncoder.withIndent('  ').convert(data);
+    await Clipboard.setData(ClipboardData(text: json));
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backup JSON copied. Save it in a safe place.')));
+  }
+
+  Future<void> _importBackup() async {
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(backgroundColor: _surface, title: const Text('Import backup'), content: SizedBox(width: 480, child: TextField(controller: controller, minLines: 5, maxLines: 10, decoration: const InputDecoration(hintText: 'Paste Nudge backup JSON'))), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Restore'))]));
+    if (confirmed == true) {
+      try {
+        final decoded = jsonDecode(controller.text) as Map<String, dynamic>;
+        await NudgeDatabase.instance.importData(decoded);
+        await _loadTasks();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backup restored successfully.')));
+      } catch (error) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup invalid: $error')));
+      }
+    }
+    controller.dispose();
+  }
   Widget _settingTile(IconData icon, String title, String subtitle) => Container(
     margin: const EdgeInsets.only(bottom: 9),
     decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(16)),
@@ -546,6 +569,7 @@ class _NudgeHomeState extends State<NudgeHome> {
     final title = TextEditingController(text: task?.title ?? '');
     final subject = TextEditingController(text: task?.subject ?? '');
     DateTime deadline = task?.due ?? DateTime.now().add(const Duration(days: 1));
+    int? selectedProjectId = task?.projectId;
     await showModalBottomSheet<void>(
       context: context, isScrollControlled: true, backgroundColor: _surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -562,6 +586,8 @@ class _NudgeHomeState extends State<NudgeHome> {
             final picked = await showDatePicker(context: sheetContext, initialDate: deadline, firstDate: DateTime(2000), lastDate: DateTime(2035), builder: (ctx, child) => Theme(data: Theme.of(ctx).copyWith(colorScheme: const ColorScheme.dark(primary: _orange, surface: _surface)), child: child!));
             if (picked != null) refresh(() => deadline = picked);
           }),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<int?>(value: selectedProjectId, decoration: const InputDecoration(labelText: 'Project'), items: [const DropdownMenuItem<int?>(value: null, child: Text('No project')), ..._projectsList.map((p) => DropdownMenuItem<int?>(value: p.id, child: Text(p.name)))], onChanged: (value) => refresh(() => selectedProjectId = value)),
           const SizedBox(height: 12),
           SizedBox(width: double.infinity, child: FilledButton(onPressed: () async {
             if (title.text.trim().isEmpty) return;
@@ -569,19 +595,19 @@ class _NudgeHomeState extends State<NudgeHome> {
               final newTitle = title.text.trim();
               final newSubject = subject.text.trim().isEmpty ? 'Personal' : subject.text.trim();
               if (task == null) {
-                await _addTask(Task(title: newTitle, subject: newSubject, due: deadline));
+                await _addTask(Task(title: newTitle, subject: newSubject, due: deadline, projectId: selectedProjectId));
               } else {
                 final id = task.id;
                 if (id == null) throw StateError('Task has no database ID.');
                 final changed = await NudgeDatabase.instance.updateTask(
-                  id: id, title: newTitle, subject: newSubject, due: deadline, projectId: task.projectId,
+                  id: id, title: newTitle, subject: newSubject, due: deadline, projectId: selectedProjectId,
                 );
                 if (changed == 0) throw StateError('Task no longer exists.');
                 if (mounted) {
                   setState(() {
                     final index = _tasks.indexOf(task);
                     if (index >= 0) {
-                      _tasks[index] = Task(id: id, title: newTitle, subject: newSubject, due: deadline, done: task.done, projectId: task.projectId);
+                      _tasks[index] = Task(id: id, title: newTitle, subject: newSubject, due: deadline, done: task.done, projectId: selectedProjectId);
                     }
                   });
                 }
