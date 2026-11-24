@@ -150,6 +150,7 @@ class _NudgeHomeState extends State<NudgeHome> {
       title: task.title,
       subject: task.subject,
       due: task.due,
+      projectId: task.projectId,
     );
     if (!mounted) return;
     setState(() => _tasks.insert(0, Task(
@@ -157,6 +158,7 @@ class _NudgeHomeState extends State<NudgeHome> {
       title: task.title,
       subject: task.subject,
       due: task.due,
+      projectId: task.projectId,
     )));
   }
 
@@ -565,11 +567,11 @@ class _NudgeHomeState extends State<NudgeHome> {
     Text('Tap + to add your first task.', style: TextStyle(color: _muted, fontSize: 12)),
   ]));
 
-  Future<void> _showAddTask({Task? task}) async {
+  Future<void> _showAddTask({Task? task, int? projectId}) async {
     final title = TextEditingController(text: task?.title ?? '');
     final subject = TextEditingController(text: task?.subject ?? '');
     DateTime deadline = task?.due ?? DateTime.now().add(const Duration(days: 1));
-    int? selectedProjectId = task?.projectId;
+    int? selectedProjectId = task?.projectId ?? projectId;
     await showModalBottomSheet<void>(
       context: context, isScrollControlled: true, backgroundColor: _surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -588,6 +590,8 @@ class _NudgeHomeState extends State<NudgeHome> {
           }),
           const SizedBox(height: 8),
           DropdownButtonFormField<int?>(value: selectedProjectId, decoration: const InputDecoration(labelText: 'Project'), items: [const DropdownMenuItem<int?>(value: null, child: Text('No project')), ..._projectsList.map((p) => DropdownMenuItem<int?>(value: p.id, child: Text(p.name)))], onChanged: (value) => refresh(() => selectedProjectId = value)),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<int?>(value: selectedProjectId, decoration: const InputDecoration(labelText: 'Project'), items: [const DropdownMenuItem<int?>(value: null, child: Text('No project')), ..._projectsList.map((p) => DropdownMenuItem<int?>(value: p.id, child: Text(p.name)))], onChanged: (value) => refresh(() => selectedProjectId = value)),
           const SizedBox(height: 12),
           SizedBox(width: double.infinity, child: FilledButton(onPressed: () async {
             if (title.text.trim().isEmpty) return;
@@ -600,7 +604,7 @@ class _NudgeHomeState extends State<NudgeHome> {
                 final id = task.id;
                 if (id == null) throw StateError('Task has no database ID.');
                 final changed = await NudgeDatabase.instance.updateTask(
-                  id: id, title: newTitle, subject: newSubject, due: deadline, projectId: selectedProjectId,
+                  id: id, title: newTitle, subject: newSubject, due: deadline, projectId: selectedProjectId, projectId: selectedProjectId,
                 );
                 if (changed == 0) throw StateError('Task no longer exists.');
                 if (mounted) {
