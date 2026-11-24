@@ -215,29 +215,47 @@ class _NudgeHomeState extends State<NudgeHome> {
     );
   }
 
+  List<Task> _sortTasksByPriority(Iterable<Task> tasks) {
+    final result = tasks.toList();
+    result.sort((a, b) {
+      // In the All view, unfinished tasks always stay above completed tasks.
+      if (a.done != b.done) return a.done ? 1 : -1;
+      // Oldest overdue task first; otherwise nearest deadline first.
+      final dueOrder = a.due.compareTo(b.due);
+      if (dueOrder != 0) return dueOrder;
+      return (a.id ?? 0).compareTo(b.id ?? 0);
+    });
+    return result;
+  }
+
   List<Task> _filteredHomeTasks() {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
     final tomorrowStart = todayStart.add(const Duration(days: 1));
+    Iterable<Task> filtered;
     switch (_taskFilter) {
       case 'Overdue':
-        return _tasks.where((t) => !t.done && t.due.isBefore(todayStart)).toList()
-          ..sort((a, b) => a.due.compareTo(b.due));
+        filtered = _tasks.where((t) => !t.done && t.due.isBefore(todayStart));
+        break;
       case 'Today':
-        return _tasks.where((t) => !t.done && !t.due.isBefore(todayStart) && t.due.isBefore(tomorrowStart)).toList();
+        filtered = _tasks.where((t) => !t.done && !t.due.isBefore(todayStart) && t.due.isBefore(tomorrowStart));
+        break;
       case 'Upcoming':
-        return _tasks.where((t) => !t.done && !t.due.isBefore(tomorrowStart)).toList();
+        filtered = _tasks.where((t) => !t.done && !t.due.isBefore(tomorrowStart));
+        break;
       case 'Completed':
-        return _tasks.where((t) => t.done).toList();
+        filtered = _tasks.where((t) => t.done);
+        break;
       default:
-        return List<Task>.from(_tasks);
+        filtered = _tasks;
     }
+    return _sortTasksByPriority(filtered);
   }
 
   Widget _home() {
     final now = DateTime.now();
     final today = _tasks.where((t) => !t.done && _sameDay(t.due, now)).toList();
-    final next = _tasks.where((t) => !t.done).toList()..sort((a, b) => a.due.compareTo(b.due));
+    final next = _sortTasksByPriority(_tasks.where((t) => !t.done));
     return ListView(
       padding: const EdgeInsets.fromLTRB(22, 18, 22, 104),
       children: [
@@ -313,7 +331,7 @@ class _NudgeHomeState extends State<NudgeHome> {
     ),
     child: Row(children: [
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('UP NEXT', style: TextStyle(color: _muted, fontSize: 11, letterSpacing: 1.5)),
+        Text(task != null && !task.done && task.due.isBefore(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day)) ? 'OVERDUE · UP NEXT' : 'UP NEXT', style: TextStyle(color: task != null && !task.done && task.due.isBefore(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day)) ? Colors.redAccent : _muted, fontSize: 11, letterSpacing: 1.5)),
         const SizedBox(height: 9),
         Text(task?.title ?? 'All caught up', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
         const SizedBox(height: 6),
@@ -370,8 +388,10 @@ class _NudgeHomeState extends State<NudgeHome> {
 
   Widget _overview() {
     final ratio = _tasks.isEmpty ? 0.0 : _completed / _tasks.length;
-    final upcoming = _tasks.where((t) => !t.done).toList()..sort((a, b) => a.due.compareTo(b.due));
-    final overdue = _tasks.where((t) => !t.done && t.due.isBefore(DateTime.now())).length;
+    final upcoming = _sortTasksByPriority(_tasks.where((t) => !t.done));
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final overdue = _tasks.where((t) => !t.done && t.due.isBefore(todayStart)).length;
     return ListView(padding: const EdgeInsets.fromLTRB(22, 24, 22, 30), children: [
       const Text('Overview', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300)),
       const SizedBox(height: 7),
