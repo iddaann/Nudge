@@ -267,7 +267,37 @@ class _NudgeHomeState extends State<NudgeHome> {
           TextButton(onPressed: () => setState(() => _tab = 1), child: const Text('View overview', style: TextStyle(color: _orange))),
         ]),
         if (_tasks.isEmpty) _emptyTasks(),
-        ..._tasks.take(6).map(_taskTile),
+        if (_tasks.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: ['All', 'Today', 'Upcoming', 'Completed'].map((filter) {
+              final selected = _taskFilter == filter;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilterChip(
+                  label: Text(filter),
+                  selected: selected,
+                  onSelected: (_) => setState(() => _taskFilter = filter),
+                  backgroundColor: _surface,
+                  selectedColor: _orange.withValues(alpha: .18),
+                  checkmarkColor: _orange,
+                  side: BorderSide(color: selected ? _orange.withValues(alpha: .5) : _surface2),
+                  labelStyle: TextStyle(color: selected ? _orange : Colors.white70, fontSize: 12),
+                  showCheckmark: false,
+                ),
+              );
+            }).toList()),
+          ),
+          const SizedBox(height: 12),
+          if (_filteredHomeTasks().isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Text('No tasks in this filter.', style: TextStyle(color: _muted)),
+            )
+          else
+            ..._filteredHomeTasks().take(6).map(_taskTile),
+        ],
       ],
     );
   }
