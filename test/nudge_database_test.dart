@@ -55,6 +55,27 @@ void main() {
     expect(await database.getTasks(), isEmpty);
   });
 
+  test('updates title, subject, and deadline', () async {
+    final initialDue = DateTime(2026, 12, 10, 9);
+    final id = await database.insertTask(
+      title: 'Draft report',
+      subject: 'Course A',
+      due: initialDue,
+    );
+    final updatedDue = DateTime(2026, 12, 20, 15);
+    final changed = await database.updateTask(
+      id: id,
+      title: 'Submit report',
+      subject: 'Course B',
+      due: updatedDue,
+    );
+    expect(changed, 1);
+    final row = (await database.getTasks()).single;
+    expect(row['title'], 'Submit report');
+    expect(row['subject'], 'Course B');
+    expect(row['due_at'], updatedDue.toIso8601String());
+  });
+
   test('keeps task data after closing and reopening database', () async {
     final due = DateTime(2026, 12, 18, 13, 30);
     final id = await database.insertTask(
