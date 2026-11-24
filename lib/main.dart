@@ -220,8 +220,11 @@ class _NudgeHomeState extends State<NudgeHome> {
     final todayStart = DateTime(now.year, now.month, now.day);
     final tomorrowStart = todayStart.add(const Duration(days: 1));
     switch (_taskFilter) {
+      case 'Overdue':
+        return _tasks.where((t) => !t.done && t.due.isBefore(todayStart)).toList()
+          ..sort((a, b) => a.due.compareTo(b.due));
       case 'Today':
-        return _tasks.where((t) => !t.done && t.due.isBefore(tomorrowStart) && !t.due.isBefore(todayStart)).toList();
+        return _tasks.where((t) => !t.done && !t.due.isBefore(todayStart) && t.due.isBefore(tomorrowStart)).toList();
       case 'Upcoming':
         return _tasks.where((t) => !t.done && !t.due.isBefore(tomorrowStart)).toList();
       case 'Completed':
@@ -271,7 +274,7 @@ class _NudgeHomeState extends State<NudgeHome> {
           const SizedBox(height: 4),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: Row(children: ['All', 'Today', 'Upcoming', 'Completed'].map((filter) {
+            child: Row(children: ['All', 'Overdue', 'Today', 'Upcoming', 'Completed'].map((filter) {
               final selected = _taskFilter == filter;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
@@ -347,7 +350,7 @@ class _NudgeHomeState extends State<NudgeHome> {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(task.title, style: TextStyle(fontSize: 14, decoration: task.done ? TextDecoration.lineThrough : null, color: task.done ? _muted : Colors.white)),
           const SizedBox(height: 5),
-          Text('${task.subject} · ${_dateLabel(task.due)}', style: const TextStyle(color: _muted, fontSize: 11)),
+          Text('${task.subject} · ${_taskDeadlineLabel(task.due, task.done)}', style: TextStyle(color: _taskDeadlineColor(task.due, task.done), fontSize: 11)),
         ])),
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_horiz, color: _muted, size: 19),
@@ -499,6 +502,24 @@ String _dateLabel(DateTime date) {
   final now = DateTime.now();
   if (_sameDay(date, now)) return 'Today';
   if (_sameDay(date, now.add(const Duration(days: 1)))) return 'Tomorrow';
+  final dayStart = DateTime(now.year, now.month, now.day);
+  if (date.isBefore(dayStart)) return 'Overdue · ${date.day} ${_monthName(date.month)}';
   return '${date.day} ${_monthName(date.month)}';
 }
 String _monthName(int m) => const ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1];
+
+String _taskDeadlineLabel(DateTime due, bool done) {
+  if (done) return _dateLabel(due);
+  final now = DateTime.now();
+  if (due.isBefore(DateTime(now.year, now.month, now.day))) {
+    return 'Overdue · ${due.day} ${_monthName(due.month)}';
+  }
+  return _dateLabel(due);
+}
+Color _taskDeadlineColor(DateTime due, bool done) {
+  if (!done) {
+    final now = DateTime.now();
+    if (due.isBefore(DateTime(now.year, now.month, now.day))) return Colors.redAccent;
+  }
+  return _muted;
+}
