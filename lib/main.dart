@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'data/nudge_database.dart';
 
 void main() => runApp(const NudgeApp());
@@ -33,6 +35,15 @@ class Task {
   final String subject;
   final DateTime due;
   bool done;
+  final int? projectId;
+}
+
+class StudyProject {
+  StudyProject({required this.id, required this.name, required this.description, required this.due});
+  final int id;
+  final String name;
+  final String description;
+  final DateTime due;
 }
 
 class NudgeHome extends StatefulWidget {
@@ -44,6 +55,10 @@ class NudgeHome extends StatefulWidget {
 class _NudgeHomeState extends State<NudgeHome> {
   int _tab = 0;
   String _taskFilter = 'All';
+  String _searchQuery = '';
+  DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime _selectedCalendarDay = DateTime.now();
+  final List<StudyProject> _projectsList = [];
   final List<Task> _tasks = [];
   bool _isLoading = true;
   String? _loadError;
@@ -64,12 +79,16 @@ class _NudgeHomeState extends State<NudgeHome> {
         subject: row['subject'] as String,
         due: DateTime.parse(row['due_at'] as String),
         done: (row['is_done'] as int) == 1,
+        projectId: row['project_id'] as int?,
       )).toList();
+      final projectRows = await NudgeDatabase.instance.getProjects();
+      final loadedProjects = projectRows.map((row) => StudyProject(id: row['id'] as int, name: row['name'] as String, description: row['description'] as String, due: DateTime.parse(row['due_at'] as String))).toList();
       if (!mounted) return;
       setState(() {
         _tasks
           ..clear()
           ..addAll(loaded);
+        _projectsList..clear()..addAll(loadedProjects);
         _isLoading = false;
         _loadError = null;
       });
@@ -183,7 +202,7 @@ class _NudgeHomeState extends State<NudgeHome> {
 
   @override
   Widget build(BuildContext context) {
-    final screens = [_home(), _overview(), _projects(), _settings()];
+    final screens = [_home(), _overview(), _calendar(), _projects(), _settings()];
     return Scaffold(
       body: SafeArea(child: _isLoading
           ? const Center(child: CircularProgressIndicator(color: _orange))
@@ -208,6 +227,7 @@ class _NudgeHomeState extends State<NudgeHome> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.analytics_outlined), label: 'Overview'),
+          NavigationDestination(icon: Icon(Icons.calendar_month_outlined), label: 'Calendar'),
           NavigationDestination(icon: Icon(Icons.folder_open_outlined), label: 'Projects'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Settings'),
         ],
@@ -249,6 +269,8 @@ class _NudgeHomeState extends State<NudgeHome> {
       default:
         filtered = _tasks;
     }
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isNotEmpty) filtered = filtered.where((t) => t.title.toLowerCase().contains(query) || t.subject.toLowerCase().contains(query));
     return _sortTasksByPriority(filtered);
   }
 
@@ -287,6 +309,7 @@ class _NudgeHomeState extends State<NudgeHome> {
           const Text('Tasks', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
           TextButton(onPressed: () => setState(() => _tab = 1), child: const Text('View overview', style: TextStyle(color: _orange))),
         ]),
+        if (_tasks.isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 10), child: TextField(onChanged: (value) => setState(() => _searchQuery = value), decoration: InputDecoration(hintText: 'Search tasks or subjects', prefixIcon: const Icon(Icons.search, color: _muted), filled: true, fillColor: _surface, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(vertical: 10)))),
         if (_tasks.isEmpty) _emptyTasks(),
         if (_tasks.isNotEmpty) ...[
           const SizedBox(height: 4),
