@@ -76,6 +76,29 @@ void main() {
     expect(row['due_at'], updatedDue.toIso8601String());
   });
 
+  test('creates projects and preserves existing tasks during schema upgrade', () async {
+    final taskId = await database.insertTask(title: 'Existing task', subject: 'Math', due: DateTime(2026, 12, 12));
+    final projectId = await database.insertProject(name: 'Final project', description: 'Semester project', due: DateTime(2027, 1, 10));
+    expect((await database.getProjects()).single['id'], projectId);
+    expect((await database.getTasks()).single['id'], taskId);
+  });
+
+  test('exports and imports projects and tasks as one backup', () async {
+    final projectId = await database.insertProject(name: 'Portfolio', description: 'Build portfolio', due: DateTime(2027, 1, 5));
+    await database.insertTask(title: 'Build homepage', subject: 'Web', due: DateTime(2026, 12, 15), projectId: projectId);
+    final backup = await database.exportData();
+    await database.importData(backup);
+    expect((await database.getProjects()).single['name'], 'Portfolio');
+    final task = (await database.getTasks()).single;
+    expect(task['title'], 'Build homepage');
+    expect(task['project_id'], projectId);
+  });
+
+  test('rejects an invalid backup without deleting current data', () async {
+    await database.insertTask(title: 'Keep me', subject: 'Test', due: DateTime(2026, 12, 20));
+    expect(() => database.importData({'format': 'wrong'}), throwsFormatException);
+    expect((await database.getTasks()).single['title'], 'Keep me');
+  });
   test('keeps task data after closing and reopening database', () async {
     final due = DateTime(2026, 12, 18, 13, 30);
     final id = await database.insertTask(
