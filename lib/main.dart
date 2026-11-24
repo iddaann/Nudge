@@ -590,8 +590,6 @@ class _NudgeHomeState extends State<NudgeHome> {
           }),
           const SizedBox(height: 8),
           DropdownButtonFormField<int?>(value: selectedProjectId, decoration: const InputDecoration(labelText: 'Project'), items: [const DropdownMenuItem<int?>(value: null, child: Text('No project')), ..._projectsList.map((p) => DropdownMenuItem<int?>(value: p.id, child: Text(p.name)))], onChanged: (value) => refresh(() => selectedProjectId = value)),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<int?>(value: selectedProjectId, decoration: const InputDecoration(labelText: 'Project'), items: [const DropdownMenuItem<int?>(value: null, child: Text('No project')), ..._projectsList.map((p) => DropdownMenuItem<int?>(value: p.id, child: Text(p.name)))], onChanged: (value) => refresh(() => selectedProjectId = value)),
           const SizedBox(height: 12),
           SizedBox(width: double.infinity, child: FilledButton(onPressed: () async {
             if (title.text.trim().isEmpty) return;
