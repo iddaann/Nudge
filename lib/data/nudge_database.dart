@@ -1,34 +1,56 @@
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
+import 'sqlite_platform.dart' as sqlitePlatform;
+
 class NudgeDatabase {
   NudgeDatabase._();
+
   static final NudgeDatabase instance = NudgeDatabase._();
+  Future<Database>? _databaseFuture;
 
-  Database? _database;
+  Future<Database> get database {
+    final existing = _databaseFuture;
+    if (existing != null) return existing;
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    final dbPath = await getDatabasesPath();
-    _database = await openDatabase(
-      p.join(dbPath, 'nudge.db'),
-      version: 1,
-      onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            subject TEXT NOT NULL,
-            due_at TEXT NOT NULL,
-            is_done INTEGER NOT NULL DEFAULT 0
-          )
-        ''');
-        await db.execute(
-          'CREATE INDEX idx_tasks_due_at ON tasks(due_at)',
-        );
-      },
+    final opening = _openDatabase();
+    _databaseFuture = opening;
+    return opening.catchError((Object error) {
+      if (identical(_databaseFuture, opening)) {
+        _databaseFuture = null;
+      }
+      throw error;
+    });
+  }
+
+  Future<Database> _openDatabase() async {
+    await sqlitePlatform.initializeSqlitePlatform();
+    final directory = await sqlitePlatform.getDatabaseDirectoryPath();
+    final dbPath = p.join(directory, 'nudge.db');
+
+    return sqlitePlatform.getDatabaseFactory().openDatabase(
+      dbPath,
+      options: OpenDatabaseOptions(
+        version: 1,
+        onConfigure: (db) async {
+          await db.execute('PRAGMA foreign_keys = ON');
+        },
+        onCreate: (db, version) async {
+          await db.execute('''
+            CREATE TABLE tasks (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              title TEXT NOT NULL,
+              subject TEXT NOT NULL,
+              due_at TEXT NOT NULL,
+              is_done INTEGER NOT NULL DEFAULT 0
+            )
+          ''');
+          await db.execute(
+            'CREATE INDEX idx_tasks_due_at ON tasks(due_at)',
+          );
+        },
+      ),
     );
-    return _database!;
   }
 
   Future<List<Map<String, Object?>>> getTasks() async {
