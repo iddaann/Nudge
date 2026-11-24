@@ -9,6 +9,10 @@ Nudge is a lightweight academic task tracker built with Flutter. It uses a dark 
 - Run in Chrome using SQLite WebAssembly and browser IndexedDB storage.
 - Filter tasks by All, Overdue, Today, Upcoming, and Completed.
 - Prioritize unfinished tasks by nearest deadline, with completed tasks at the bottom of the All list.
+- Organize tasks into projects and track milestone completion progress.
+- Browse deadlines in a monthly calendar and inspect tasks by date.
+- Search task titles and subjects.
+- Export and restore a versioned JSON backup containing projects and tasks.
 
 ## Run in Chrome
 
@@ -39,4 +43,5 @@ The repository includes SQLite CRUD and persistence tests in `test/nudge_databas
 ## Notes
 
 - Task data is stored locally on the device/browser; it is not synchronized to a cloud account.
-- Clearing browser site data can erase the local web database. Export/backup is not implemented yet.
+- Clearing browser site data can erase the local web database. Export a JSON backup regularly and keep it somewhere safe.
+- Export copies JSON to the clipboard. Import replaces the current local task and project data after validating the backup format.
