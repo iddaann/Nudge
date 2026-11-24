@@ -51,13 +51,29 @@ class NudgeDatabase {
             )
           ''');
           await db.execute('CREATE INDEX idx_tasks_due_at ON tasks(due_at)');
-          await db.execute('CREATE TABLE projects (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', due_at TEXT NOT NULL, created_at TEXT NOT NULL)');
+          await db.execute("""
+            CREATE TABLE projects (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              description TEXT NOT NULL DEFAULT '',
+              due_at TEXT NOT NULL,
+              created_at TEXT NOT NULL
+            )
+          """);
           await db.execute('ALTER TABLE tasks ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL');
           await db.execute('CREATE INDEX idx_tasks_project_id ON tasks(project_id)');
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 2) {
-          await db.execute('CREATE TABLE projects (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', due_at TEXT NOT NULL, created_at TEXT NOT NULL)');
+          await db.execute("""
+            CREATE TABLE projects (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              description TEXT NOT NULL DEFAULT '',
+              due_at TEXT NOT NULL,
+              created_at TEXT NOT NULL
+            )
+          """);
           await db.execute('ALTER TABLE tasks ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL');
           await db.execute('CREATE INDEX idx_tasks_project_id ON tasks(project_id)');
           }
