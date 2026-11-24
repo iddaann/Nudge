@@ -43,6 +43,7 @@ class NudgeHome extends StatefulWidget {
 
 class _NudgeHomeState extends State<NudgeHome> {
   int _tab = 0;
+  String _taskFilter = 'All';
   final List<Task> _tasks = [];
   bool _isLoading = true;
   String? _loadError;
@@ -212,6 +213,22 @@ class _NudgeHomeState extends State<NudgeHome> {
         ],
       ),
     );
+  }
+
+  List<Task> _filteredHomeTasks() {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final tomorrowStart = todayStart.add(const Duration(days: 1));
+    switch (_taskFilter) {
+      case 'Today':
+        return _tasks.where((t) => !t.done && t.due.isBefore(tomorrowStart) && !t.due.isBefore(todayStart)).toList();
+      case 'Upcoming':
+        return _tasks.where((t) => !t.done && !t.due.isBefore(tomorrowStart)).toList();
+      case 'Completed':
+        return _tasks.where((t) => t.done).toList();
+      default:
+        return List<Task>.from(_tasks);
+    }
   }
 
   Widget _home() {
