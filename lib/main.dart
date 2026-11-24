@@ -29,7 +29,7 @@ class NudgeApp extends StatelessWidget {
 }
 
 class Task {
-  Task({this.id, required this.title, required this.subject, required this.due, this.done = false});
+  Task({this.id, required this.title, required this.subject, required this.due, this.done = false, this.projectId});
   final int? id;
   final String title;
   final String subject;
@@ -574,14 +574,14 @@ class _NudgeHomeState extends State<NudgeHome> {
                 final id = task.id;
                 if (id == null) throw StateError('Task has no database ID.');
                 final changed = await NudgeDatabase.instance.updateTask(
-                  id: id, title: newTitle, subject: newSubject, due: deadline,
+                  id: id, title: newTitle, subject: newSubject, due: deadline, projectId: task.projectId,
                 );
                 if (changed == 0) throw StateError('Task no longer exists.');
                 if (mounted) {
                   setState(() {
                     final index = _tasks.indexOf(task);
                     if (index >= 0) {
-                      _tasks[index] = Task(id: id, title: newTitle, subject: newSubject, due: deadline, done: task.done);
+                      _tasks[index] = Task(id: id, title: newTitle, subject: newSubject, due: deadline, done: task.done, projectId: task.projectId);
                     }
                   });
                 }
