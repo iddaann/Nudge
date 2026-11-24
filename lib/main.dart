@@ -438,6 +438,34 @@ class _NudgeHomeState extends State<NudgeHome> {
     ]);
   }
 
+  Widget _calendar() {
+    final first = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
+    final days = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0).day;
+    final offset = first.weekday - 1;
+    final selectedTasks = _sortTasksByPriority(_tasks.where((t) => _sameDay(t.due, _selectedCalendarDay)));
+    return ListView(padding: const EdgeInsets.all(22), children: [
+      const Text('Calendar', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300)),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        IconButton(onPressed: () => setState(() => _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month - 1)), icon: const Icon(Icons.chevron_left)),
+        Text('${_monthName(_calendarMonth.month)} ${_calendarMonth.year}', style: const TextStyle(fontSize: 18)),
+        IconButton(onPressed: () => setState(() => _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month + 1)), icon: const Icon(Icons.chevron_right)),
+      ]),
+      const Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [Text('M'), Text('T'), Text('W'), Text('T'), Text('F'), Text('S'), Text('S')]),
+      const SizedBox(height: 10),
+      GridView.builder(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: offset + days, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, mainAxisSpacing: 6, crossAxisSpacing: 6), itemBuilder: (context, index) {
+        if (index < offset) return const SizedBox();
+        final day = index - offset + 1;
+        final date = DateTime(_calendarMonth.year, _calendarMonth.month, day);
+        final hasTasks = _tasks.any((t) => _sameDay(t.due, date));
+        final selected = _sameDay(date, _selectedCalendarDay);
+        return InkWell(onTap: () => setState(() => _selectedCalendarDay = date), borderRadius: BorderRadius.circular(12), child: Container(decoration: BoxDecoration(color: selected ? _orange.withValues(alpha: .2) : _surface, borderRadius: BorderRadius.circular(12), border: selected ? Border.all(color: _orange) : null), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text('$day'), if (hasTasks) Container(width: 5, height: 5, decoration: const BoxDecoration(color: _orange, shape: BoxShape.circle))])));
+      }),
+      const SizedBox(height: 20),
+      Text('Tasks · ${_selectedCalendarDay.day} ${_monthName(_selectedCalendarDay.month)}', style: const TextStyle(fontSize: 17)),
+      const SizedBox(height: 10),
+      if (selectedTasks.isEmpty) const Text('No tasks on this date.', style: TextStyle(color: _muted)) else ...selectedTasks.map(_taskTile),
+    ]);
+  }
   Widget _projects() => ListView(padding: const EdgeInsets.all(22), children: [
     const SizedBox(height: 8),
     const Text('Projects', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300)),
