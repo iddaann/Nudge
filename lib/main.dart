@@ -466,25 +466,59 @@ class _NudgeHomeState extends State<NudgeHome> {
       if (selectedTasks.isEmpty) const Text('No tasks on this date.', style: TextStyle(color: _muted)) else ...selectedTasks.map(_taskTile),
     ]);
   }
-  Widget _projects() => ListView(padding: const EdgeInsets.all(22), children: [
-    const SizedBox(height: 8),
-    const Text('Projects', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300)),
-    const SizedBox(height: 7),
-    const Text('Make big assignments feel manageable.', style: TextStyle(color: _muted)),
-    const SizedBox(height: 23),
-    Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(22)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Container(width: 42, height: 42, decoration: BoxDecoration(color: _orange.withValues(alpha: .13), borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.layers_outlined, color: _orange)),
-      const SizedBox(height: 16),
-      const Text('UAS Project Planner', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-      const SizedBox(height: 7),
-      const Text('Break a final project into milestones, small tasks, and realistic due dates. Project planning will be the next feature we build.', style: TextStyle(color: _muted, height: 1.5)),
-      const SizedBox(height: 18),
-      OutlinedButton.icon(onPressed: () => _showAddTask(), icon: const Icon(Icons.add), label: const Text('Add a project task'), style: OutlinedButton.styleFrom(foregroundColor: _orange)),
-    ])),
-    const SizedBox(height: 20),
-    const Text('Tasks assigned to projects will be grouped here in a later update.', style: TextStyle(color: _muted, height: 1.5)),
-  ]);
+  Future<void> _showProjectDialog({StudyProject? project}) async {
+    final name = TextEditingController(text: project?.name ?? '');
+    final description = TextEditingController(text: project?.description ?? '');
+    DateTime due = project?.due ?? DateTime.now().add(const Duration(days: 30));
+    await showDialog<void>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, refresh) => AlertDialog(backgroundColor: _surface, title: Text(project == null ? 'New project' : 'Edit project'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+      TextField(controller: name, decoration: const InputDecoration(labelText: 'Project name')),
+      TextField(controller: description, decoration: const InputDecoration(labelText: 'Description')),
+      ListTile(title: const Text('Deadline'), subtitle: Text(_dateLabel(due)), onTap: () async { final picked = await showDatePicker(context: ctx, initialDate: due, firstDate: DateTime(2000), lastDate: DateTime(2035)); if (picked != null) refresh(() => due = picked); }),
+    ]), actions: [
+      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+      FilledButton(onPressed: () async {
+        if (name.text.trim().isEmpty) return;
+        if (project == null) {
+          final id = await NudgeDatabase.instance.insertProject(name: name.text.trim(), description: description.text.trim(), due: due);
+          if (mounted) setState(() => _projectsList.add(StudyProject(id: id, name: name.text.trim(), description: description.text.trim(), due: due)));
+        } else {
+          await NudgeDatabase.instance.updateProject(id: project.id, name: name.text.trim(), description: description.text.trim(), due: due);
+          if (mounted) setState(() { final i = _projectsList.indexOf(project); if (i >= 0) _projectsList[i] = StudyProject(id: project.id, name: name.text.trim(), description: description.text.trim(), due: due); });
+        }
+        if (ctx.mounted) Navigator.pop(ctx);
+      }, child: const Text('Save')),
+    ])));
+    name.dispose(); description.dispose();
+  }
 
+  Future<void> _deleteProject(StudyProject project) async {
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(backgroundColor: _surface, title: const Text('Delete project?'), content: const Text('Tasks assigned to it will remain and become unassigned.'), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete'))]));
+    if (ok != true) return;
+    await NudgeDatabase.instance.deleteProject(project.id);
+    if (mounted) setState(() => _projectsList.remove(project));
+  }
+  Widget _projects() => ListView(padding: const EdgeInsets.all(22), children: [
+    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Projects', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300)), IconButton(onPressed: () => _showProjectDialog(), icon: const Icon(Icons.add, color: _orange))]),
+    const Text('Group related tasks into projects and milestones.', style: TextStyle(color: _muted)),
+    const SizedBox(height: 18),
+    if (_projectsList.isEmpty) const Text('No projects yet. Create one to get started.', style: TextStyle(color: _muted)),
+    ..._projectsList.map((project) {
+      final items = _tasks.where((t) => t.projectId == project.id).toList();
+      final completed = items.where((t) => t.done).length;
+      final ratio = items.isEmpty ? 0.0 : completed / items.length;
+      return Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(18)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [Expanded(child: Text(project.name, style: const TextStyle(fontSize: 17))), PopupMenuButton<String>(onSelected: (v) { if (v == 'edit') _showProjectDialog(project: project); if (v == 'delete') _deleteProject(project); }, itemBuilder: (_) => const [PopupMenuItem(value: 'edit', child: Text('Edit')), PopupMenuItem(value: 'delete', child: Text('Delete'))])]),
+        if (project.description.isNotEmpty) Text(project.description, style: const TextStyle(color: _muted)),
+        const SizedBox(height: 10),
+        LinearProgressIndicator(value: ratio, color: _orange, backgroundColor: _surface2),
+        const SizedBox(height: 6),
+        Text('$completed/${items.length} milestones completed · Due ${_dateLabel(project.due)}', style: const TextStyle(color: _muted, fontSize: 11)),
+        const SizedBox(height: 8),
+        ...items.map(_taskTile),
+        TextButton.icon(onPressed: () => _showAddTask(projectId: project.id), icon: const Icon(Icons.add), label: const Text('Add milestone', style: TextStyle(color: _orange))),
+      ]));
+    }),
+  ]);
   Widget _settings() => ListView(padding: const EdgeInsets.fromLTRB(22, 24, 22, 30), children: [
     const Text('Settings', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300)),
     const SizedBox(height: 7),
