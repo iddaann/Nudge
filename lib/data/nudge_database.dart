@@ -85,6 +85,21 @@ class NudgeDatabase {
     });
   }
 
+  Future<int> updateTask({
+    required int id,
+    required String title,
+    required String subject,
+    required DateTime due,
+  }) async {
+    final db = await database;
+    return db.update(
+      'tasks',
+      {'title': title, 'subject': subject, 'due_at': due.toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<int> updateTaskDone(int id, bool isDone) async {
     final db = await database;
     return db.update(
