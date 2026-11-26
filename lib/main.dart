@@ -674,7 +674,7 @@ class _NudgeHomeState extends State<NudgeHome> {
                 if (changed == 0) throw StateError('Task no longer exists.');
                 try { await ReminderService.instance.scheduleTask(taskId: id, title: newTitle, due: deadline, done: task.done); } catch (reminderError) { debugPrint('Reminder update failed: $reminderError'); }
                 if (mounted) {
-                  setState({
+                  setState(() {
                     final index = _tasks.indexOf(task);
                     if (index >= 0) {
                       _tasks[index] = Task(id: id, title: newTitle, subject: newSubject, due: deadline, done: task.done, projectId: selectedProjectId);
