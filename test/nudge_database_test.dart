@@ -115,4 +115,39 @@ void main() {
     expect(rows.single['is_done'], 1);
     expect(rows.single['due_at'], due.toIso8601String());
   });
+  test('rejects blank task fields and invalid project references', () async {
+    await expectLater(
+      database.insertTask(title: '  ', subject: 'Programming', due: DateTime(2026, 12, 10)),
+      throwsArgumentError,
+    );
+    await expectLater(
+      database.insertTask(title: 'Task', subject: 'Programming', due: DateTime(2026, 12, 10), projectId: 999),
+      throwsArgumentError,
+    );
+    expect(await database.getTasks(), isEmpty);
+  });
+
+  test('malformed backup is rejected before existing data is replaced', () async {
+    await database.insertTask(title: 'Keep existing', subject: 'Test', due: DateTime(2026, 12, 20));
+    final invalid = {
+      'format": "nudge-backup",
+      "version": 1,
+      "projects": [],
+      "tasks": [
+        {"id": 1, "title": "Broken", "subject": "Test", "due_at": "not-a-date", "is_done": 0, "project_id": null}
+      ]
+    };
+    await expectLater(database.importData(invalid), throwsFormatException);
+    expect((await database.getTasks()).single['title'], 'Keep existing');
+  });
+
+  test('deleting a project unassigns its tasks instead of deleting them', () async {
+    final projectId = await database.insertProject(name: 'Group project', description: '', due: DateTime(2027, 1, 10));
+    await database.insertTask(title: 'Presentation', subject: 'OS', due: DateTime(2026, 12, 15), projectId: projectId);
+    expect(await database.deleteProject(projectId), 1);
+    final task = (await database.getTasks()).single;
+    expect(task['title'], 'Presentation');
+    expect(task['project_id'], isNull);
+  });
+
 }
