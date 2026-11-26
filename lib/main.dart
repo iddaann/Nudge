@@ -602,7 +602,7 @@ class _NudgeHomeState extends State<NudgeHome> {
                 final id = task.id;
                 if (id == null) throw StateError('Task has no database ID.');
                 final changed = await NudgeDatabase.instance.updateTask(
-                  id: id, title: newTitle, subject: newSubject, due: deadline, projectId: selectedProjectId, projectId: selectedProjectId,
+                  id: id, title: newTitle, subject: newSubject, due: deadline, projectId: selectedProjectId,
                 );
                 if (changed == 0) throw StateError('Task no longer exists.');
                 if (mounted) {
