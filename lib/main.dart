@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 // ignore: deprecated_member_use
-// Keep Flutter's stable Material widgets until the replacement package is fully supported.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'data/nudge_database.dart';
@@ -681,8 +680,8 @@ class _NudgeHomeState extends State<NudgeHome> {
             if (picked != null) refresh(() => deadline = picked);
           }),
           const SizedBox(height: 8),
-          DropdownButtonFormField<int?>(// ignore: deprecated_member_use
-            value: selectedProjectId, decoration: const InputDecoration(labelText: 'Project'), items: [const DropdownMenuItem<int?>(value: null, child: Text('No project')), ..._projectsList.map((p) => DropdownMenuItem<int?>(value: p.id, child: Text(p.name)))], onChanged: (value) => refresh(() => selectedProjectId = value)),
+          DropdownButtonFormField<int?>(
+            initialValue: selectedProjectId, decoration: const InputDecoration(labelText: 'Project'), items: [const DropdownMenuItem<int?>(value: null, child: Text('No project')), ..._projectsList.map((p) => DropdownMenuItem<int?>(value: p.id, child: Text(p.name)))], onChanged: (value) => refresh(() => selectedProjectId = value)),
           const SizedBox(height: 12),
           SizedBox(width: double.infinity, child: FilledButton(onPressed: () async {
             if (title.text.trim().isEmpty) return;
