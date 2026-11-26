@@ -150,4 +150,25 @@ void main() {
     expect(task['project_id'], isNull);
   });
 
+  test('project CRUD and duplicate backup IDs are handled safely', () async {
+    final projectId = await database.insertProject(name: 'Initial', description: 'd', due: DateTime(2027, 1, 10));
+    expect(await database.updateProject(id: projectId, name: 'Updated', description: 'new', due: DateTime(2027, 2, 1)), 1);
+    expect((await database.getProjects()).single['name'], 'Updated');
+    await database.insertTask(title: 'Existing', subject: 'Test', due: DateTime(2026, 12, 20));
+    final invalidBackup = {
+      'format': 'nudge-backup',
+      'version': 1,
+      'projects': [
+        {'id': 4, 'name': 'Duplicate A', 'description': '', 'due_at': '2027-01-01', 'created_at': '2026-11-26'},
+        {'id': 4, 'name': 'Duplicate B', 'description': '', 'due_at': '2027-01-02', 'created_at': '2026-11-26'}
+      ],
+      'tasks': []
+    };
+    await expectLater(database.importData(invalidBackup), throwsFormatException);
+    expect((await database.getTasks()).single['title'], 'Existing');
+    expect((await database.getProjects()).single['name'], 'Updated');
+    expect(await database.deleteProject(projectId), 1);
+    expect(await database.getProjects(), isEmpty);
+  });
+
 }
