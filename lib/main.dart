@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'data/nudge_database.dart';
@@ -595,6 +596,10 @@ class _NudgeHomeState extends State<NudgeHome> {
   ]);
 
   Future<void> _refreshReminders() async {
+    if (kIsWeb) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Browser tidak mendukung reminder terjadwal. Smart Nudge tetap tersedia.')));
+      return;
+    }
     try {
       await ReminderService.instance.rescheduleAll(await NudgeDatabase.instance.getTasks());
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reminder schedules refreshed. Notification permission may be required.')));
