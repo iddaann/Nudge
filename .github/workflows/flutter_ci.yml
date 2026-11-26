@@ -40,3 +40,13 @@ jobs:
 
       - name: Build web release
         run: flutter build web --release --base-href /Nudge/
+
+      - name: Build Android release APK
+        run: flutter build apk --release
+
+      - name: Upload Android APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nudge-android-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
