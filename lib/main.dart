@@ -217,11 +217,14 @@ class _NudgeHomeState extends State<NudgeHome> {
   Widget build(BuildContext context) {
     final screens = [_home(), _overview(), _calendar(), _projects(), _settings()];
     return Scaffold(
-      body: SafeArea(child: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: _orange))
-          : _loadError != null
-              ? _databaseErrorView()
-              : IndexedStack(index: _tab, children: screens)),
+      body: SafeArea(child: Center(child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 860),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: _orange))
+            : _loadError != null
+                ? _databaseErrorView()
+                : IndexedStack(index: _tab, children: screens),
+      ))),
       floatingActionButton: _tab == 0
           ? FloatingActionButton(
               onPressed: (_isLoading || _loadError != null) ? null : () => _showAddTask(),
@@ -543,15 +546,23 @@ class _NudgeHomeState extends State<NudgeHome> {
     ]), actions: [
       TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
       FilledButton(onPressed: () async {
-        if (name.text.trim().isEmpty) return;
-        if (project == null) {
-          final id = await NudgeDatabase.instance.insertProject(name: name.text.trim(), description: description.text.trim(), due: due);
-          if (mounted) setState(() => _projectsList.add(StudyProject(id: id, name: name.text.trim(), description: description.text.trim(), due: due)));
-        } else {
-          await NudgeDatabase.instance.updateProject(id: project.id, name: name.text.trim(), description: description.text.trim(), due: due);
-          if (mounted) setState(() { final i = _projectsList.indexOf(project); if (i >= 0) _projectsList[i] = StudyProject(id: project.id, name: name.text.trim(), description: description.text.trim(), due: due); });
+        if (name.text.trim().isEmpty) {
+          ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Project name cannot be empty.')));
+          return;
         }
-        if (ctx.mounted) Navigator.pop(ctx);
+        try {
+          if (project == null) {
+            final id = await NudgeDatabase.instance.insertProject(name: name.text.trim(), description: description.text.trim(), due: due);
+            if (mounted) setState(() => _projectsList.add(StudyProject(id: id, name: name.text.trim(), description: description.text.trim(), due: due)));
+          } else {
+            final changed = await NudgeDatabase.instance.updateProject(id: project.id, name: name.text.trim(), description: description.text.trim(), due: due);
+            if (changed == 0) throw StateError('Project no longer exists.');
+            if (mounted) setState(() { final i = _projectsList.indexOf(project); if (i >= 0) _projectsList[i] = StudyProject(id: project.id, name: name.text.trim(), description: description.text.trim(), due: due); });
+          }
+          if (ctx.mounted) Navigator.pop(ctx);
+        } catch (error) {
+          if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Project failed to save: $error')));
+        }
       }, child: const Text('Save')),
     ])));
     name.dispose(); description.dispose();
@@ -560,8 +571,12 @@ class _NudgeHomeState extends State<NudgeHome> {
   Future<void> _deleteProject(StudyProject project) async {
     final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(backgroundColor: _surface, title: const Text('Delete project?'), content: const Text('Tasks assigned to it will remain and become unassigned.'), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete'))]));
     if (ok != true) return;
-    await NudgeDatabase.instance.deleteProject(project.id);
-    if (mounted) setState(() => _projectsList.remove(project));
+    try {
+      await NudgeDatabase.instance.deleteProject(project.id);
+      if (mounted) setState(() => _projectsList.remove(project));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Project failed to delete: $error')));
+    }
   }
   Widget _projects() => ListView(padding: const EdgeInsets.all(22), children: [
     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Projects', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300)), IconButton(onPressed: () => _showProjectDialog(), icon: const Icon(Icons.add, color: _orange))]),
