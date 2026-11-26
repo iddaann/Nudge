@@ -12,5 +12,11 @@ void main() {
     expect(find.text('Overview'), findsOneWidget);
     expect(find.text('Calendar'), findsOneWidget);
     expect(find.text('Projects'), findsOneWidget);
+    await tester.tap(find.text('Calendar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Calendar'), findsOneWidget);
+    await tester.tap(find.text('Projects').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Projects'), findsOneWidget);
   });
 }
