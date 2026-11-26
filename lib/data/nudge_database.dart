@@ -1,7 +1,7 @@
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
-import 'sqlite_platform.dart' as sqlitePlatform;
+import 'sqlite_platform.dart' as sqlite_platform;
 
 class NudgeDatabase {
   NudgeDatabase._({this._databasePathOverride});
@@ -22,9 +22,9 @@ class NudgeDatabase {
   }
 
   Future<Database> _openDatabase() async {
-    await sqlitePlatform.initializeSqlitePlatform();
-    final dbPath = _databasePathOverride ?? p.join(await sqlitePlatform.getDatabaseDirectoryPath(), 'nudge.db');
-    return sqlitePlatform.getDatabaseFactory().openDatabase(dbPath, options: OpenDatabaseOptions(
+    await sqlite_platform.initializeSqlitePlatform();
+    final dbPath = _databasePathOverride ?? p.join(await sqlite_platform.getDatabaseDirectoryPath(), 'nudge.db');
+    return sqlite_platform.getDatabaseFactory().openDatabase(dbPath, options: OpenDatabaseOptions(
       version: 2,
       onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, version) async {
