@@ -62,6 +62,7 @@ class ReminderService {
           channelDescription: 'Reminder deadline tugas Nudge',
           importance: Importance.high, priority: Priority.high,
         )),
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       );
     }
