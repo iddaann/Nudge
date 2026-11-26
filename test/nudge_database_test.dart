@@ -130,7 +130,7 @@ void main() {
   test('malformed backup is rejected before existing data is replaced', () async {
     await database.insertTask(title: 'Keep existing', subject: 'Test', due: DateTime(2026, 12, 20));
     final invalid = {
-      'format": "nudge-backup",
+      'format': 'nudge-backup',
       "version": 1,
       "projects": [],
       "tasks": [
