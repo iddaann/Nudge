@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'data/nudge_database.dart';
+import 'services/reminder_service.dart';
 
 void main() => runApp(const NudgeApp());
 
@@ -81,6 +82,7 @@ class _NudgeHomeState extends State<NudgeHome> {
         done: (row['is_done'] as int) == 1,
         projectId: row['project_id'] as int?,
       )).toList();
+      try { await ReminderService.instance.rescheduleAll(rows); } catch (reminderError) { debugPrint('Reminder setup skipped: $reminderError'); }
       final projectRows = await NudgeDatabase.instance.getProjects();
       final loadedProjects = projectRows.map((row) => StudyProject(id: row['id'] as int, name: row['name'] as String, description: row['description'] as String, due: DateTime.parse(row['due_at'] as String))).toList();
       if (!mounted) return;
@@ -152,6 +154,7 @@ class _NudgeHomeState extends State<NudgeHome> {
       due: task.due,
       projectId: task.projectId,
     );
+    try { await ReminderService.instance.scheduleTask(taskId: id, title: task.title, due: task.due, done: false); } catch (error) { debugPrint('Reminder schedule failed: $error'); }
     if (!mounted) return;
     setState(() => _tasks.insert(0, Task(
       id: id,
@@ -172,6 +175,7 @@ class _NudgeHomeState extends State<NudgeHome> {
     try {
       final changed = await NudgeDatabase.instance.updateTaskDone(id, nextDone);
       if (changed == 0) throw StateError('Task $id no longer exists in SQLite.');
+      await ReminderService.instance.scheduleTask(taskId: id, title: task.title, due: task.due, done: nextDone);
     } catch (error) {
       if (!mounted) return;
       setState(() => task.done = previous);
@@ -191,6 +195,7 @@ class _NudgeHomeState extends State<NudgeHome> {
     try {
       if (task.id != null) {
         await NudgeDatabase.instance.deleteTask(task.id!);
+        await ReminderService.instance.cancelTask(task.id!);
       }
     } catch (error) {
       if (!mounted) return;
@@ -293,6 +298,8 @@ class _NudgeHomeState extends State<NudgeHome> {
         Text('$_pending tasks waiting for you', style: const TextStyle(color: _muted, fontSize: 14)),
         const SizedBox(height: 22),
         _nextCard(next.isEmpty ? null : next.first, today),
+        const SizedBox(height: 12),
+        _smartNudge(),
         const SizedBox(height: 26),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text('Your progress', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
@@ -345,6 +352,57 @@ class _NudgeHomeState extends State<NudgeHome> {
             ..._filteredHomeTasks().take(6).map(_taskTile),
         ],
       ],
+    );
+  }
+
+  Widget _smartNudge() {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 1));
+    final todayTasks = _tasks.where((t) => !t.done && !t.due.isBefore(start) && t.due.isBefore(end)).toList();
+    final overdueTasks = _tasks.where((t) => !t.done && t.due.isBefore(start)).toList();
+    final weekEnd = start.add(const Duration(days: 7));
+    final dueSoon = _tasks.where((t) => !t.done && !t.due.isBefore(start) && t.due.isBefore(weekEnd)).toList();
+    final crowded = dueSoon.any((task) => dueSoon.where((t) => _sameDay(t.due, task.due)).length >= 3);
+    String headline, detail;
+    IconData icon;
+    Color accent;
+    if (overdueTasks.isNotEmpty) {
+      headline = 'Clear overdue tasks first';
+      detail = '${overdueTasks.length} task(s) past deadline. Pick one and finish a small part today.';
+      icon = Icons.warning_amber_rounded; accent = Colors.redAccent;
+    } else if (todayTasks.length >= 3) {
+      headline = 'Today is packed';
+      detail = '${todayTasks.length} deadlines today. Prioritize one, then use focused work blocks.';
+      icon = Icons.local_fire_department_outlined; accent = _orange;
+    } else if (crowded) {
+      headline = 'Deadline cluster detected';
+      detail = 'At least one day this week has 3+ unfinished tasks. Start one early.';
+      icon = Icons.calendar_month_outlined; accent = Colors.amber;
+    } else if (todayTasks.isNotEmpty) {
+      headline = 'One task to focus on today';
+      detail = 'Finish ${_sortTasksByPriority(todayTasks).first.title} before taking on another.';
+      icon = Icons.bolt_outlined; accent = _orange;
+    } else if (dueSoon.isNotEmpty) {
+      headline = 'Make a little progress';
+      detail = '${dueSoon.length} upcoming tasks this week. Start with ${_sortTasksByPriority(dueSoon).first.title}.';
+      icon = Icons.lightbulb_outline; accent = _orange;
+    } else {
+      headline = 'You have breathing room';
+      detail = 'No deadlines in the next 7 days. Get ahead or add upcoming tasks.';
+      icon = Icons.spa_outlined; accent = _orange;
+    }
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: accent.withValues(alpha: .25))),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, color: accent, size: 22), const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('SMART NUDGE', style: TextStyle(color: accent, fontSize: 10, letterSpacing: 1.4, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 5), Text(headline, style: const TextStyle(fontWeight: FontWeight.w500)),
+          const SizedBox(height: 5), Text(detail, style: const TextStyle(color: _muted, fontSize: 12)),
+        ])),
+      ]),
     );
   }
 
@@ -526,12 +584,21 @@ class _NudgeHomeState extends State<NudgeHome> {
     const SizedBox(height: 7),
     const Text('Keep Nudge simple and personal.', style: TextStyle(color: _muted)),
     const SizedBox(height: 20),
-    _settingTile(Icons.notifications_none_rounded, 'Reminders', 'Scheduled local reminders will be added next'),
+    ListTile(leading: const Icon(Icons.notifications_active_outlined, color: _orange), title: const Text('Deadline reminders'), subtitle: const Text('Reschedule reminders for unfinished tasks', style: TextStyle(color: _muted, fontSize: 12)), onTap: _refreshReminders),
     _settingTile(Icons.dark_mode_outlined, 'Appearance', 'Dark mode · warm orange accents'),
     ListTile(leading: const Icon(Icons.backup_outlined, color: _orange), title: const Text('Export backup'), subtitle: const Text('Copy JSON backup to clipboard', style: TextStyle(color: _muted, fontSize: 12)), onTap: _exportBackup),
     ListTile(leading: const Icon(Icons.restore_outlined, color: _orange), title: const Text('Import backup'), subtitle: const Text('Restore from JSON backup', style: TextStyle(color: _muted, fontSize: 12)), onTap: _importBackup),
     _settingTile(Icons.info_outline_rounded, 'About Nudge', 'Personal academic task tracker'),
   ]);
+
+  Future<void> _refreshReminders() async {
+    try {
+      await ReminderService.instance.rescheduleAll(await NudgeDatabase.instance.getTasks());
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reminder schedules refreshed. Notification permission may be required.')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not schedule reminders: $error')));
+    }
+  }
 
   Future<void> _exportBackup() async {
     final data = await NudgeDatabase.instance.exportData();
@@ -605,8 +672,9 @@ class _NudgeHomeState extends State<NudgeHome> {
                   id: id, title: newTitle, subject: newSubject, due: deadline, projectId: selectedProjectId,
                 );
                 if (changed == 0) throw StateError('Task no longer exists.');
+                try { await ReminderService.instance.scheduleTask(taskId: id, title: newTitle, due: deadline, done: task.done); } catch (reminderError) { debugPrint('Reminder update failed: $reminderError'); }
                 if (mounted) {
-                  setState(() {
+                  setState({
                     final index = _tasks.indexOf(task);
                     if (index >= 0) {
                       _tasks[index] = Task(id: id, title: newTitle, subject: newSubject, due: deadline, done: task.done, projectId: selectedProjectId);
