@@ -5,7 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart' as ffi;
 
-import '../lib/data/nudge_database.dart';
+import 'package:nudge/data/nudge_database.dart';
 
 void main() {
   late Directory temporaryDirectory;
