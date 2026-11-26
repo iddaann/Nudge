@@ -118,7 +118,7 @@ void main() {
   test('rejects blank task fields and invalid project references', () async {
     await expectLater(
       database.insertTask(title: '  ', subject: 'Programming', due: DateTime(2026, 12, 10)),
-      throwsArgumentError,
+      throwsFormatException,
     );
     await expectLater(
       database.insertTask(title: 'Task', subject: 'Programming', due: DateTime(2026, 12, 10), projectId: 999),
