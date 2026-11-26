@@ -175,7 +175,6 @@ class _NudgeHomeState extends State<NudgeHome> {
     try {
       final changed = await NudgeDatabase.instance.updateTaskDone(id, nextDone);
       if (changed == 0) throw StateError('Task $id no longer exists in SQLite.');
-      await ReminderService.instance.scheduleTask(taskId: id, title: task.title, due: task.due, done: nextDone);
     } catch (error) {
       if (!mounted) return;
       setState(() => task.done = previous);
@@ -185,6 +184,11 @@ class _NudgeHomeState extends State<NudgeHome> {
     } finally {
       _updatingTaskIds.remove(id);
     }
+    try {
+      await ReminderService.instance.scheduleTask(taskId: id, title: task.title, due: task.due, done: nextDone);
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status tersimpan, tetapi reminder gagal: $error')));
+    }
   }
 
   Future<void> _remove(Task task) async {
@@ -193,17 +197,16 @@ class _NudgeHomeState extends State<NudgeHome> {
     // Dismissible needs the widget removed synchronously after the swipe.
     setState(() => _tasks.removeAt(index));
     try {
-      if (task.id != null) {
-        await NudgeDatabase.instance.deleteTask(task.id!);
-        await ReminderService.instance.cancelTask(task.id!);
-      }
+      if (task.id != null) await NudgeDatabase.instance.deleteTask(task.id!);
     } catch (error) {
       if (!mounted) return;
       final restoreAt = index > _tasks.length ? _tasks.length : index;
       setState(() => _tasks.insert(restoreAt, task));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Tugas gagal dihapus dari database: $error')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Tugas gagal dihapus dari database: $error')));
+      return;
+    }
+    if (task.id != null) {
+      try { await ReminderService.instance.cancelTask(task.id!); } catch (error) { debugPrint('Reminder cancel failed: $error'); }
     }
   }
 
