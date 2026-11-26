@@ -36,12 +36,28 @@ flutter run
 ```bash
 flutter analyze
 flutter test
+flutter build web --release --base-href /Nudge/
 ```
 
-The repository includes SQLite CRUD and persistence tests in `test/nudge_database_test.dart`. Run the web setup command before launching the app in Chrome so the SQLite WASM assets are available.
+CI runs analysis, tests, and a release web build on pushes and pull requests to `main` and `improvement`.
 
-## Notes
+## Deployment (GitHub Pages)
 
-- Task data is stored locally on the device/browser; it is not synchronized to a cloud account.
-- Clearing browser site data can erase the local web database. Export a JSON backup regularly and keep it somewhere safe.
-- Export copies JSON to the clipboard. Import replaces the current local task and project data after validating the backup format.
+Web deployment is configured to run automatically when code is pushed to the `improvement` branch.
+
+1. Open the repository **Settings → Pages**.
+2. In **Build and deployment → Source**, select **GitHub Actions** (one-time setup).
+3. Push a commit to `improvement` or run the **Deploy Nudge Web to GitHub Pages** workflow manually from Actions.
+4. When the deployment workflow succeeds, the app is published at:
+
+   https://iddaann.github.io/Nudge/
+
+Deployment status: check the Actions tab. The first deployment may fail until GitHub Pages is enabled for the repository.
+
+## Data and privacy
+
+- Tasks and projects are stored locally on the device/browser; there is no account or cloud sync.
+- Browser storage is origin-specific. Changing the deployment URL or clearing browser site data can make the local database inaccessible or erase it.
+- Export JSON regularly and keep a copy somewhere safe.
+- Import restores a backup by replacing the existing local task and project data.
+- SQLite Web uses browser IndexedDB-backed storage; this is not a server-side database.
