@@ -15,7 +15,7 @@ void main() {
     await tester.tap(find.text('Calendar'));
     await tester.pumpAndSettle();
     expect(find.text('Calendar'), findsOneWidget);
-    await tester.tap(find.text('Projects').last);
+    await tester.tap(find.text('Projects'));
     await tester.pumpAndSettle();
     expect(find.text('Projects'), findsOneWidget);
   });
