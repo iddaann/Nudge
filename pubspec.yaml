@@ -1,7 +1,7 @@
 name: nudge
 description: Personal academic task planner
 publish_to: 'none'
-version: 0.1.0+1
+version: 1.0.0+14
 environment:
   sdk: ^3.14.0
 dependencies:
@@ -13,6 +13,8 @@ dependencies:
   sqflite_common_ffi_web: ^1.2.2
   path_provider: ^2.1.6
   path: ^1.9.1
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
